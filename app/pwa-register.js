@@ -34,6 +34,71 @@ export function registerServiceWorker() {
   }
 }
 
+// Function to safely unregister service workers - useful for logout/cleanup
+export function cleanupServiceWorkers() {
+  if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+    return navigator.serviceWorker.getRegistrations()
+      .then(registrations => {
+        console.log(`Cleaning up ${registrations.length} service workers`);
+        const unregisterPromises = registrations.map(registration => {
+          return registration.unregister().catch(err => {
+            console.error('Error unregistering service worker:', err);
+            // Return false to indicate failure, but don't break the Promise.all
+            return false;
+          });
+        });
+        
+        return Promise.all(unregisterPromises);
+      })
+      .catch(err => {
+        console.error('Error getting service worker registrations:', err);
+        return false;
+      });
+  }
+  return Promise.resolve(false);
+}
+
+// Function to clear site data - useful for troubleshooting
+export function clearSiteData() {
+  if (typeof window !== 'undefined') {
+    try {
+      // Clear cookies
+      document.cookie.split(";").forEach(c => {
+        document.cookie = c.replace(/^ +/, "").replace(/=.*/, 
+          "=;expires=" + new Date().toUTCString() + ";path=/");
+      });
+      
+      // Clear storage
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      // Unregister service workers
+      return cleanupServiceWorkers();
+    } catch (e) {
+      console.error('Error clearing site data:', e);
+      return Promise.resolve(false);
+    }
+  }
+  return Promise.resolve(false);
+}
+
+// Function to handle safe sign-out
+export function handleSafeSignOut(redirectUrl = '/') {
+  if (typeof window !== 'undefined') {
+    // First clean up service workers
+    return cleanupServiceWorkers()
+      .then(() => {
+        // Then clear site data
+        return clearSiteData();
+      })
+      .finally(() => {
+        // Always redirect, even if cleanup fails
+        window.location.href = redirectUrl;
+      });
+  }
+  return Promise.resolve(false);
+}
+
 // Function to handle PWA installation event
 export function setupPwaInstallPrompt() {
   if (typeof window !== 'undefined') {

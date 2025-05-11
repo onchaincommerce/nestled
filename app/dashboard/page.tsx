@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { PassageUserInterface } from '@/utils/passage-types';
+import { handleSafeSignOut } from '@/app/pwa-register';
 
 // This is a client component so we'll handle authentication on the client side
 export default function Dashboard() {
@@ -92,18 +93,35 @@ export default function Dashboard() {
 
   const handleSignOut = async () => {
     try {
-      if (passageUser && typeof passageUser.signOut === 'function') {
-        await passageUser.signOut();
-        router.push('/');
-      } else {
-        // Fallback for when passageUser is not available
-        router.push('/');
+      // Set loading state to prevent UI issues during signout
+      setIsLoading(true);
+      
+      // Prevent multiple sign-out attempts
+      const signOutBtn = document.querySelector('button[onClick="handleSignOut"]');
+      if (signOutBtn) {
+        signOutBtn.setAttribute('disabled', 'true');
       }
+      
+      // First clear any auth state in our app
+      setUserID('');
+      setUserName('Partner');
+      setAuthAttempted(false);
+      
+      if (passageUser && typeof passageUser.signOut === 'function') {
+        // Wrap in try/catch to prevent crash if signOut fails
+        try {
+          await passageUser.signOut();
+        } catch (e) {
+          console.error('Error during Passage signOut:', e);
+        }
+      }
+      
+      // Use the safe sign-out utility that cleans up service workers and redirects
+      handleSafeSignOut('/');
     } catch (error) {
       console.error('Sign out error:', error);
       setError('Failed to sign out. Please try again.');
-      // Fallback redirect if signOut fails
-      router.push('/');
+      setIsLoading(false);
     }
   };
 
