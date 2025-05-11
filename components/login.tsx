@@ -2,6 +2,11 @@
 
 import { useEffect, useState } from 'react';
 
+// Define a type for the Passage object
+interface PassageInstance {
+  PassageUser: new () => any;
+}
+
 const PassageLogin = () => {
   const [isClient, setIsClient] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -115,7 +120,7 @@ const PassageLogin = () => {
     <div className="w-full max-w-md mx-auto bg-white rounded-xl shadow-lg p-8 transition-all duration-300 hover:shadow-xl">
       {isClient && isPassageReady && (
         <div className="passage-auth-container">
-          {/* @ts-ignore - Custom element */}
+          {/* @ts-expect-error - Custom element */}
           <passage-auth app-id={passageAppId}></passage-auth>
           
           {/* Optional: Add a manual trigger button for passkeys if auto-detection fails */}
@@ -136,7 +141,7 @@ const PassageLogin = () => {
 // Add TypeScript interface for Window with Passage
 declare global {
   interface Window {
-    Passage?: any;
+    Passage?: PassageInstance;
   }
 }
 

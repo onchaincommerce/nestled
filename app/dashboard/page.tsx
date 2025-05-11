@@ -28,7 +28,7 @@ export default function Dashboard() {
           }
           
           // Get the PassageUser class from the global Passage object
-          // @ts-ignore - We know this exists because we checked window.Passage
+          // @ts-expect-error - We know this exists because we checked window.Passage
           const PassageUser = window.Passage.PassageUser;
           const user = new PassageUser() as PassageUserInterface;
           setPassageUser(user);
@@ -102,7 +102,7 @@ export default function Dashboard() {
       <main className="flex-1 container mx-auto py-6 px-4">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-800">Welcome, {userName}!</h1>
-          <p className="text-gray-600 text-sm mt-1">Here's what's happening in your relationship.</p>
+          <p className="text-gray-600 text-sm mt-1">Here&apos;s what&apos;s happening in your relationship.</p>
         </div>
 
         {/* Dashboard Cards */}

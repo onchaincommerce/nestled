@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import PassageLogin from '@/components/login';
 
@@ -17,7 +16,7 @@ export default function Home() {
     const checkAuth = async () => {
       if (typeof window !== 'undefined' && window.Passage) {
         try {
-          // @ts-ignore - We know this exists because we checked window.Passage
+          // @ts-expect-error - We know this exists because we checked window.Passage
           const PassageUser = window.Passage.PassageUser;
           const user = new PassageUser();
           const isAuthorized = await user.isAuthenticated();

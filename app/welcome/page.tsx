@@ -30,7 +30,7 @@ export default function Welcome() {
           }
           
           // Get the PassageUser class from the global Passage object
-          // @ts-ignore - We know this exists because we checked window.Passage
+          // @ts-expect-error - We know this exists because we checked window.Passage
           const PassageUser = window.Passage.PassageUser;
           const user = new PassageUser() as PassageUserInterface;
           setPassageUser(user);
@@ -141,7 +141,7 @@ export default function Welcome() {
                 </span>
               </div>
               <h1 className="text-2xl font-bold text-gray-800">Welcome, {userName}!</h1>
-              <p className="text-gray-600 mt-2">You've successfully signed in using passkeys.</p>
+              <p className="text-gray-600 mt-2">You&apos;ve successfully signed in using passkeys.</p>
             </div>
             
             {error && (
