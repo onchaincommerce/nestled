@@ -3,12 +3,14 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import PassageLogin from '@/components/login';
 
 export default function Home() {
   const [isClient, setIsClient] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const inviteCode = searchParams?.get('code') || '';
 
   useEffect(() => {
     setIsClient(true);
@@ -24,6 +26,10 @@ export default function Home() {
           
           if (isAuthorized) {
             // User is already authenticated, redirect to dashboard
+            // If there's an invite code, include it in the redirection
+            if (inviteCode) {
+              localStorage.setItem('pendingInviteCode', inviteCode);
+            }
             router.push('/dashboard');
           }
         } catch (error) {
@@ -53,7 +59,7 @@ export default function Home() {
     // Start attempting to check authentication
     attemptCheckAuth();
     
-  }, [router]);
+  }, [router, inviteCode]);
 
   return (
     <main className="min-h-screen flex flex-col relative overflow-hidden">
@@ -86,7 +92,7 @@ export default function Home() {
           </div>
           
           <div className="max-w-md mx-auto mb-10">
-            <PassageLogin />
+            <PassageLogin inviteCodeFromUrl={inviteCode} />
           </div>
           
           {/* Features */}

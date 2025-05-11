@@ -21,6 +21,8 @@ export default function Dashboard() {
   const [authAttempted, setAuthAttempted] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [baseUrl, setBaseUrl] = useState('');
+  const [processingInviteCode, setProcessingInviteCode] = useState(false);
+  const [inviteRedeemResult, setInviteRedeemResult] = useState<{success: boolean, message: string} | null>(null);
 
   useEffect(() => {
     // Set the base URL for sharing invite links
@@ -36,6 +38,61 @@ export default function Dashboard() {
         setIsLoading(false);
       }
     }, 5000); // 5 second timeout maximum
+    
+    // Check if there's a pending invite code to process
+    const checkPendingInviteCode = async (userId: string) => {
+      const pendingInviteCode = localStorage.getItem('pendingInviteCode');
+      
+      if (pendingInviteCode && userId) {
+        setProcessingInviteCode(true);
+        console.log('Found pending invite code:', pendingInviteCode);
+        
+        try {
+          // Call the API to redeem the invitation
+          const response = await fetch('/api/couples/redeem-invite', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 
+              code: pendingInviteCode,
+              passageId: userId 
+            }),
+          });
+          
+          const data = await response.json();
+          
+          if (response.ok) {
+            console.log('Successfully redeemed invitation:', data);
+            setInviteRedeemResult({
+              success: true,
+              message: 'Successfully connected with your partner!'
+            });
+          } else {
+            console.error('Failed to redeem invitation:', data);
+            setInviteRedeemResult({
+              success: false,
+              message: data.error || 'Failed to redeem invitation code'
+            });
+          }
+        } catch (error) {
+          console.error('Error redeeming invitation:', error);
+          setInviteRedeemResult({
+            success: false,
+            message: 'An error occurred while processing your invitation'
+          });
+        } finally {
+          // Clear the pending invite code
+          localStorage.removeItem('pendingInviteCode');
+          setProcessingInviteCode(false);
+          
+          // Hide the result message after 5 seconds
+          setTimeout(() => {
+            setInviteRedeemResult(null);
+          }, 5000);
+        }
+      }
+    };
     
     // Check if this is client-side
     if (typeof window !== 'undefined') {
@@ -128,6 +185,9 @@ export default function Dashboard() {
               if (userInfo) {
                 setUserName(userInfo.email || userInfo.phone || 'Partner');
                 setUserID(userInfo.id || userId || '');
+                
+                // Check for pending invite code after authentication is confirmed
+                checkPendingInviteCode(userInfo.id || userId || '');
                 
                 // Register user in Supabase database using direct API call
                 // This is more reliable than relying on the auth token
@@ -327,6 +387,23 @@ export default function Dashboard() {
           <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary-700 to-secondary-700">Welcome, {userName}!</h1>
           <p className="text-gray-600 text-sm">Here&apos;s what&apos;s happening in your relationship.</p>
         </div>
+
+        {/* Invite redemption notification */}
+        {processingInviteCode && (
+          <div className="mb-4 p-3 bg-blue-50/90 text-blue-700 rounded-2xl border border-blue-100/50 flex items-center">
+            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Processing your invitation code...
+          </div>
+        )}
+
+        {inviteRedeemResult && (
+          <div className={`mb-4 p-3 ${inviteRedeemResult.success ? 'bg-green-50/90 text-green-700 border-green-100/50' : 'bg-red-50/90 text-red-700 border-red-100/50'} rounded-2xl border`}>
+            {inviteRedeemResult.message}
+          </div>
+        )}
 
         {/* User ID & Test Entry */}
         {error && (
