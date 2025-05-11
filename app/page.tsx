@@ -3,22 +3,13 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import PassageLogin from '@/components/login';
 
 export default function Home() {
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
-    
-    // Initialize Passage when the component mounts (using the proper import method)
-    if (typeof window !== 'undefined') {
-      const passageAppId = process.env.NEXT_PUBLIC_PASSAGE_APP_ID || 'boyEzeiNczYXppbj5F87neMd';
-      
-      // Import using dynamic import to avoid SSR issues
-      import('@passageidentity/passage-js').then(({ PassageAuth }) => {
-        new PassageAuth(passageAppId);
-      });
-    }
   }, []);
 
   return (
@@ -35,9 +26,7 @@ export default function Home() {
               A private, delightful space for couples to journal together, plan dates, and build a scrapbook of memories.
             </p>
             <div className="bg-white rounded-xl shadow-lg p-8 max-w-md">
-              {isClient && (
-                <div id="passage-auth"></div>
-              )}
+              <PassageLogin />
             </div>
           </div>
           <div className="md:w-1/2 md:pl-12">

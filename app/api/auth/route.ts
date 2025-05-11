@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPassageUser } from '@/utils/passage';
+import { getAuthenticatedUser } from '@/utils/passage';
 import { getSupabaseWithUser, supabase } from '@/utils/supabase';
 
 export async function POST(req: NextRequest) {
   try {
     // Authenticate the request using Passage
-    const passageData = await getPassageUser(req);
+    const passageData = await getAuthenticatedUser(req);
     
     if (!passageData.isAuthorized) {
       return NextResponse.json(

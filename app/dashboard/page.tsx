@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { PassageUser } from '@passageidentity/passage-elements/passage-user';
 
 // This is a client component so we'll handle authentication on the client side
 // for the actual implementation, we'd use getServerSideProps to check authentication
@@ -10,15 +11,29 @@ export default function Dashboard() {
   const router = useRouter();
   const [userName, setUserName] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [userID, setUserID] = useState('');
 
   useEffect(() => {
     // Check if this is client-side
     if (typeof window !== 'undefined') {
-      // Here we would check for authentication
+      // Check if the PassageUser element is defined
+      require('@passageidentity/passage-elements/passage-user');
+      
+      // Check authentication
       const checkAuth = async () => {
         try {
-          // In a real implementation, we would fetch user data here
-          setUserName('Partner');
+          const passageUser = new PassageUser();
+          const isAuthorized = await passageUser.isAuthenticated();
+          
+          if (!isAuthorized) {
+            router.push('/');
+            return;
+          }
+          
+          // User is authenticated, get their info
+          const userInfo = await passageUser.userInfo();
+          setUserName(userInfo.email || 'Partner');
+          setUserID(userInfo.id || '');
           setIsLoading(false);
         } catch (error) {
           console.error('Auth error:', error);
@@ -29,6 +44,16 @@ export default function Dashboard() {
       checkAuth();
     }
   }, [router]);
+
+  const handleSignOut = async () => {
+    try {
+      const passageUser = new PassageUser();
+      await passageUser.signOut();
+      router.push('/');
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -63,10 +88,7 @@ export default function Dashboard() {
           <div>
             <button 
               className="px-4 py-2 rounded-lg bg-secondary-100 text-secondary-700 hover:bg-secondary-200 transition"
-              onClick={() => {
-                // In a real app, we would handle logout here
-                router.push('/');
-              }}
+              onClick={handleSignOut}
             >
               Sign out
             </button>
@@ -79,6 +101,7 @@ export default function Dashboard() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-800">Welcome, {userName}!</h1>
           <p className="text-gray-600 mt-2">Here's what's happening in your relationship.</p>
+          <p className="text-xs text-gray-500 mt-1">User ID: {userID}</p>
         </div>
 
         {/* Dashboard Cards */}

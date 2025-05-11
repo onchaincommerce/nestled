@@ -1,63 +1,80 @@
 import Passage from '@passageidentity/passage-node';
 
-// Define the type for the Passage instance to prevent TypeScript errors
-type PassageInstance = {
+// TypeScript interface for the Passage instance to handle type checking
+interface PassageInstanceType {
   appId: string;
   apiKey?: string;
-  authTokens: {
-    isValid: (token: string) => Promise<string | false>;
-  };
+  authenticateRequest: (req: any) => Promise<string | false>;
   user: {
-    get: (userId: string) => Promise<{
-      id: string;
-      email: string;
-      phone: string;
-      created_at: string;
-      updated_at: string;
-      last_login_at: string;
-      status: string;
-    }>;
+    get: (userId: string) => Promise<any>;
   };
-};
+}
 
-export const getPassageInstance = (): PassageInstance => {
-  const passageAppId = process.env.NEXT_PUBLIC_PASSAGE_APP_ID || 'boyEzeiNczYXppbj5F87neMd';
-  const passageApiKey = process.env.PASSAGE_API_KEY || '';
+// Initialize Passage with your app ID and API key
+const passage = new Passage({
+  appId: process.env.NEXT_PUBLIC_PASSAGE_APP_ID || 'boyEzeiNczYXppbj5F87neMd',
+  apiKey: process.env.PASSAGE_API_KEY || '',
+}) as unknown as PassageInstanceType;
 
-  // @ts-ignore - We're using a custom type to handle the Passage instance
-  return new Passage({
-    appId: passageAppId,
-    apiKey: passageApiKey,
-  });
-};
-
-// Utility to get Passage auth status and user info from requests
-export const getPassageUser = async (req: Request) => {
-  try {
-    const passage = getPassageInstance();
+// Function to extract the authentication token from different types of requests
+const getAuthToken = (req: any): string | undefined => {
+  // Try to get the token from cookies
+  if (req.cookies?.psg_auth_token) {
+    return req.cookies.psg_auth_token;
+  }
+  
+  // If using the App Router, cookies are in the headers
+  if (req.headers?.get) {
+    const cookieHeader = req.headers.get('cookie');
+    if (cookieHeader) {
+      const cookies = cookieHeader.split('; ');
+      const tokenCookie = cookies.find(c => c.startsWith('psg_auth_token='));
+      if (tokenCookie) {
+        return tokenCookie.split('=')[1];
+      }
+    }
+  }
+  
+  // Try to get the token from the authorization header
+  const authHeader = 
+    (req.headers?.authorization) || 
+    (req.headers?.get && req.headers.get('authorization'));
     
-    // Get auth token from request cookie
-    const authToken = req.headers.get('cookie')?.split('; ')
-      .find(row => row.startsWith('psg_auth_token='))
-      ?.split('=')[1];
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return authHeader.substring(7);
+  }
+  
+  return undefined;
+};
+
+export const getAuthenticatedUser = async (req: any) => {
+  try {
+    const authToken = getAuthToken(req);
     
     if (!authToken) {
       return { isAuthorized: false, userID: null };
     }
     
+    // App Router doesn't provide the same request object as Pages Router
+    // We need to create a compatible request object
+    const compatReq = {
+      headers: {
+        authorization: `Bearer ${authToken}`
+      },
+      cookies: {
+        psg_auth_token: authToken
+      }
+    };
+    
     try {
-      // Validate the token using the authTokens.isValid method
-      const userID = await passage.authTokens.isValid(authToken);
+      const userID = await passage.authenticateRequest(compatReq);
       
       if (userID) {
-        // Get the user details from Passage
         const user = await passage.user.get(userID);
         return { 
           isAuthorized: true, 
           userID,
-          email: user.email,
-          created_at: user.created_at,
-          updated_at: user.updated_at,
+          email: user.email
         };
       }
     } catch (authError) {
@@ -66,7 +83,10 @@ export const getPassageUser = async (req: Request) => {
     
     return { isAuthorized: false, userID: null };
   } catch (error) {
-    console.error('Passage auth error:', error);
+    console.error('Authentication error:', error);
     return { isAuthorized: false, userID: null };
   }
-}; 
+};
+
+// For backwards compatibility with the example code
+export const getAuthenticatedUserFromSession = getAuthenticatedUser; 
