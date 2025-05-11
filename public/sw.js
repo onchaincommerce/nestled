@@ -2,14 +2,21 @@
 
 const CACHE_NAME = 'nestled-v1';
 
-// Assets to cache
+// Assets to cache - remove authenticated routes
 const urlsToCache = [
   '/',
-  '/dashboard',
   '/manifest.json',
   '/icons/icon-192x192.png',
   '/icons/icon-384x384.png', 
   '/icons/icon-512x512.png'
+];
+
+// Define authenticated routes that should never be cached
+const AUTHENTICATED_ROUTES = [
+  '/dashboard', 
+  '/journal', 
+  '/scrapbook', 
+  '/date-planner'
 ];
 
 // Install event - cache assets
@@ -49,13 +56,26 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // For API requests, always go to network first
-  if (event.request.url.includes('/api/')) {
-    return fetch(event.request)
-      .catch(error => {
-        console.error('Fetch error:', error);
-        return caches.match(event.request);
-      });
+  // Check if the request is for an authenticated route
+  const url = new URL(event.request.url);
+  const isAuthenticatedRoute = AUTHENTICATED_ROUTES.some(route => 
+    url.pathname === route || url.pathname.startsWith(`${route}/`)
+  );
+
+  // For authenticated routes or API requests, always go to network and don't cache
+  if (isAuthenticatedRoute || url.pathname.includes('/api/')) {
+    // Use fetch with { redirect: 'follow' } to handle redirects properly
+    return event.respondWith(
+      fetch(event.request, { redirect: 'follow' })
+        .catch(error => {
+          console.error('Fetch error for authenticated route:', error);
+          // If network fails, return a specific offline message for authenticated routes
+          return new Response('You need to be online to access this page', {
+            status: 503,
+            headers: { 'Content-Type': 'text/html' }
+          });
+        })
+    );
   }
 
   // For other requests, try cache first, then network

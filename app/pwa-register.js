@@ -3,13 +3,30 @@
 export function registerServiceWorker() {
   if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
     window.addEventListener('load', function() {
-      navigator.serviceWorker.register('/sw.js')
-        .then(function(registration) {
-          console.log('Service Worker registered with scope:', registration.scope);
-        })
-        .catch(function(error) {
-          console.error('Service Worker registration failed:', error);
-        });
+      // Unregister any existing service workers first
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for(let registration of registrations) {
+          console.log('Unregistering existing service worker');
+          registration.unregister().then(function(success) {
+            if (success) {
+              console.log('Service worker unregistered successfully');
+            }
+          });
+        }
+        
+        // After a short delay, register the new service worker
+        setTimeout(() => {
+          navigator.serviceWorker.register('/sw.js', {
+            updateViaCache: 'none' // Don't use cached version
+          })
+            .then(function(registration) {
+              console.log('Service Worker registered with scope:', registration.scope);
+            })
+            .catch(function(error) {
+              console.error('Service Worker registration failed:', error);
+            });
+        }, 1000);
+      });
     });
   }
 }
