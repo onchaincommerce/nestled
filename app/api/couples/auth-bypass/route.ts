@@ -17,7 +17,18 @@ const getServiceSupabase = () => {
   
   console.log('Initializing Supabase with service role');
   
-  return createClient(supabaseUrl, supabaseKey);
+  return createClient(supabaseUrl, supabaseKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    },
+    global: {
+      headers: {
+        // This explicitly disables RLS for service role
+        'X-Supabase-Auth-Token': ''
+      },
+    },
+  });
 };
 
 // API Key for simple auth - should match what you set in the frontend
@@ -76,39 +87,88 @@ export async function GET(request: NextRequest) {
       );
     }
     
-    const dbUserId = await getUserIdFromPassageId(passageId);
-    if (!dbUserId) {
+    const supabase = getServiceSupabase();
+    
+    // First get the user's database ID using a direct SQL query to avoid RLS
+    const { data: userResult, error: userError } = await supabase.rpc('get_user_by_passage_id', {
+      p_passage_id: passageId
+    });
+    
+    if (userError) {
+      console.error('Error finding user:', userError);
+      
+      // Fallback to standard query if RPC fails
+      const { data: userData, error: standardUserError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('passage_id', passageId)
+        .single();
+        
+      if (standardUserError || !userData) {
+        return NextResponse.json(
+          { error: 'User not found', details: standardUserError || 'No data returned' },
+          { status: 404 }
+        );
+      }
+      
+      const dbUserId = userData.id;
+      
+      // Get couples via direct query
+      const { data: couplesData, error: couplesError } = await supabase
+        .from('couples_users')
+        .select('couple_id, couples:couple_id(id, name, created_at)')
+        .eq('user_id', dbUserId);
+        
+      if (couplesError) {
+        console.error('Error fetching couples:', couplesError);
+        return NextResponse.json(
+          { error: 'Error fetching couples', details: couplesError },
+          { status: 500 }
+        );
+      }
+      
+      return NextResponse.json({
+        couples: couplesData.map(cu => cu.couples)
+      });
+    }
+    
+    if (!userResult || !userResult.id) {
       return NextResponse.json(
-        { error: 'User not found' },
+        { error: 'User not found via RPC' },
         { status: 404 }
       );
     }
     
-    const supabase = getServiceSupabase();
+    const dbUserId = userResult.id;
     
-    // Get all couples for this user using service role that bypasses RLS
-    const { data: couplesData, error: couplesError } = await supabase
-      .from('couples_users')
-      .select(`
-        couple_id,
-        couples (
-          id,
-          name,
-          created_at
-        )
-      `)
-      .eq('user_id', dbUserId);
-      
+    // Get couples via RPC
+    const { data: couplesResult, error: couplesError } = await supabase.rpc('get_couples_for_user', {
+      p_user_id: dbUserId
+    });
+    
     if (couplesError) {
-      console.error('Error fetching couples:', couplesError);
-      return NextResponse.json(
-        { error: 'Error fetching couples', details: couplesError },
-        { status: 500 }
-      );
+      console.error('Error fetching couples via RPC:', couplesError);
+      
+      // Fallback to direct SQL
+      const { data: couplesData, error: directError } = await supabase
+        .from('couples_users')
+        .select('couple_id, couples:couple_id(id, name, created_at)')
+        .eq('user_id', dbUserId);
+        
+      if (directError) {
+        return NextResponse.json(
+          { error: 'Error fetching couples', details: directError },
+          { status: 500 }
+        );
+      }
+      
+      return NextResponse.json({
+        couples: couplesData.map(cu => cu.couples)
+      });
     }
     
     return NextResponse.json({
-      couples: couplesData.map(cu => cu.couples)
+      couples: couplesResult
     });
   } catch (error) {
     console.error('Error in auth-bypass GET endpoint:', error);

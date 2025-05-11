@@ -97,8 +97,9 @@ export default function InvitePartnerModal({
       console.error('Standard API failed, status:', response.status, 'trying fallback...');
       
       // Use the new auth-bypass endpoint as a fallback
-      const authBypassUrl = addApiKeyToUrl(`/api/couples/auth-bypass?passageId=${userID}`);
+      const authBypassUrl = `/api/couples/auth-bypass?passageId=${userID}`;
       const bypassResponse = await fetch(authBypassUrl, {
+        method: 'GET',
         headers: {
           'Authorization': `Bearer ${API_KEY}`,
           'Content-Type': 'application/json'
@@ -112,18 +113,14 @@ export default function InvitePartnerModal({
         return;
       }
       
-      // Now get the invitations using the new API
-      const inviteBypassUrl = addApiKeyToUrl(`/api/couples/auth-bypass`);
+      // Now get the invitations using the direct endpoint
+      const inviteBypassUrl = `/api/couples/auth-bypass/invite?passageId=${userID}`;
       const inviteResponse = await fetch(inviteBypassUrl, {
-        method: 'POST',
+        method: 'GET',
         headers: {
           'Authorization': `Bearer ${API_KEY}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          passageId: userID,
-          action: 'get_invitations'
-        })
       });
       
       if (!inviteResponse.ok) {
@@ -168,7 +165,7 @@ export default function InvitePartnerModal({
       console.error('Standard API POST failed, status:', response.status, 'trying fallback...');
       
       // Use the new auth-bypass endpoint to create the invitation
-      const authBypassUrl = addApiKeyToUrl(`/api/couples/auth-bypass`);
+      const authBypassUrl = `/api/couples/auth-bypass/invite`;
       const bypassResponse = await fetch(authBypassUrl, {
         method: 'POST',
         headers: {
@@ -176,8 +173,7 @@ export default function InvitePartnerModal({
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          passageId: userID,
-          action: 'create_invitation'
+          passageId: userID
         })
       });
       
