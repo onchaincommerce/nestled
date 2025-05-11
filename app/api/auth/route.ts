@@ -36,6 +36,7 @@ export async function POST(req: NextRequest) {
       await supabase.from('users').insert({
         id: userID,
         email: email,
+        username: email ? email.split('@')[0] : `user_${userID.substring(0, 8)}`
       });
     }
     

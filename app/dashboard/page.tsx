@@ -69,6 +69,24 @@ export default function Dashboard() {
               const userInfo = await user.userInfo();
               setUserName(userInfo.email || userInfo.phone || 'Partner');
               setUserID(userInfo.id || '');
+              
+              // Register user in Supabase database
+              try {
+                const response = await fetch('/api/auth', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                });
+                
+                if (!response.ok) {
+                  console.error('Failed to register user in Supabase');
+                } else {
+                  console.log('User successfully registered in Supabase');
+                }
+              } catch (error) {
+                console.error('Error registering user in Supabase:', error);
+              }
             }
           } catch (error) {
             console.error('Auth error, but continuing:', error);

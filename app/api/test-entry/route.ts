@@ -26,7 +26,10 @@ export async function POST(request: Request) {
     if (userCheckError) {
       const { error: createUserError } = await supabase
         .from('users')
-        .insert({ id: userId });
+        .insert({ 
+          id: userId,
+          username: `user_${userId.substring(0, 8)}` // Add default username
+        });
       
       if (createUserError) {
         console.error('Error creating user:', createUserError);
