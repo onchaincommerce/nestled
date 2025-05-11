@@ -7,7 +7,6 @@ import PassageLogin from '@/components/login';
 
 export default function Home() {
   const [isClient, setIsClient] = useState(false);
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
@@ -15,52 +14,31 @@ export default function Home() {
     
     // Check if user is already logged in
     const checkAuth = async () => {
-      try {
-        // Make sure Passage is loaded before checking auth
-        if (typeof window !== 'undefined') {
-          // Wait for Passage to be available
-          if (!window.Passage) {
-            console.log('Passage not loaded yet, waiting...');
-            return; // Will retry on next interval
-          }
-          
-          console.log('Passage found, checking authentication');
+      if (typeof window !== 'undefined' && window.Passage) {
+        try {
+          // @ts-ignore - We know this exists because we checked window.Passage
           const PassageUser = window.Passage.PassageUser;
           const user = new PassageUser();
+          const isAuthorized = await user.isAuthenticated();
           
-          try {
-            const isAuthorized = await user.isAuthenticated();
-            console.log('Authentication check result:', isAuthorized);
-            
-            if (isAuthorized) {
-              // User is already authenticated, redirect to dashboard
-              router.push('/dashboard');
-            } else {
-              // User is not authenticated, stop checking
-              setIsCheckingAuth(false);
-            }
-          } catch (authError) {
-            console.error('Authentication check failed:', authError);
-            setIsCheckingAuth(false);
+          if (isAuthorized) {
+            // User is already authenticated, redirect to dashboard
+            router.push('/dashboard');
           }
+        } catch (error) {
+          console.error('Auth check error:', error);
+          // Fall back to showing the login page
         }
-      } catch (error) {
-        console.error('Auth check error:', error);
-        setIsCheckingAuth(false);
       }
     };
     
-    // Try to check auth every second until either authenticated 
-    // or we confirm not authenticated
-    const intervalId = setInterval(() => {
-      if (isCheckingAuth) {
-        checkAuth();
-      }
+    // Add a delay to ensure Passage has loaded
+    const timer = setTimeout(() => {
+      checkAuth();
     }, 1000);
     
-    // Clean up the interval on unmount
-    return () => clearInterval(intervalId);
-  }, [router, isCheckingAuth]);
+    return () => clearTimeout(timer);
+  }, [router]);
 
   return (
     <main className="min-h-screen flex flex-col">

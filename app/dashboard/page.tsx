@@ -20,66 +20,45 @@ export default function Dashboard() {
   useEffect(() => {
     // Check if this is client-side
     if (typeof window !== 'undefined') {
-      // Load Passage JS SDK if not already loaded
-      const loadPassageSDK = async () => {
-        if (!window.Passage) {
-          try {
-            await import('@passageidentity/passage-js');
-            console.log('Passage SDK loaded in dashboard');
-          } catch (error) {
-            console.error('Failed to load Passage SDK:', error);
-            router.push('/');
-            return;
-          }
-        }
-        
-        checkAuthentication();
-      };
-      
-      // Check authentication status
-      const checkAuthentication = async () => {
+      // Load Passage and check auth
+      const loadPassage = async () => {
         try {
-          // Make sure Passage is available
+          // Check if the Passage global object is available
           if (!window.Passage) {
-            console.error('Passage not loaded yet');
+            console.error('Passage is not loaded yet');
             router.push('/');
             return;
           }
           
           // Get the PassageUser class from the global Passage object
-          const PassageUser = window.Passage.PassageUser;
+          const PassageUser = window.Passage?.PassageUser;
           const user = new PassageUser() as PassageUserInterface;
           setPassageUser(user);
           
-          // Check if the user is authenticated
           const isAuthorized = await user.isAuthenticated();
-          console.log('Dashboard authentication check:', isAuthorized);
           
           if (!isAuthorized) {
-            console.log('User not authorized, redirecting to login');
             router.push('/');
             return;
           }
           
           // User is authenticated, get their info
-          try {
-            const userInfo = await user.userInfo();
-            setUserName(userInfo.email || userInfo.phone || 'Partner');
-            setUserID(userInfo.id || '');
-            setIsLoading(false);
-          } catch (userInfoError) {
-            console.error('Error getting user info:', userInfoError);
-            setError('Failed to load user information');
-            setIsLoading(false);
-          }
+          const userInfo = await user.userInfo();
+          setUserName(userInfo.email || userInfo.phone || 'Partner');
+          setUserID(userInfo.id || '');
+          setIsLoading(false);
         } catch (error) {
-          console.error('Authentication error:', error);
+          console.error('Auth error:', error);
           router.push('/');
         }
       };
       
-      // Start the process
-      loadPassageSDK();
+      // Add a small delay to ensure Passage has time to initialize
+      const timer = setTimeout(() => {
+        loadPassage();
+      }, 500);
+      
+      return () => clearTimeout(timer);
     }
   }, [router]);
 
