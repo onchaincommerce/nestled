@@ -30,8 +30,7 @@ export default function Welcome() {
           }
           
           // Get the PassageUser class from the global Passage object
-          // @ts-expect-error - We know this exists because we checked window.Passage
-          const PassageUser = window.Passage.PassageUser;
+          const PassageUser = window.Passage?.PassageUser;
           const user = new PassageUser() as PassageUserInterface;
           setPassageUser(user);
           

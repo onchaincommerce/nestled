@@ -16,8 +16,7 @@ export default function Home() {
     const checkAuth = async () => {
       if (typeof window !== 'undefined' && window.Passage) {
         try {
-          // @ts-expect-error - We know this exists because we checked window.Passage
-          const PassageUser = window.Passage.PassageUser;
+          const PassageUser = window.Passage?.PassageUser;
           const user = new PassageUser();
           const isAuthorized = await user.isAuthenticated();
           
