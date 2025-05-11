@@ -27,6 +27,21 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Function to create a couple_user relation safely
+CREATE OR REPLACE FUNCTION create_couple_user_relation(p_couple_id UUID, p_user_id UUID)
+RETURNS VOID
+SECURITY DEFINER
+AS $$
+BEGIN
+  INSERT INTO couples_users (couple_id, user_id)
+  VALUES (p_couple_id, p_user_id);
+EXCEPTION
+  WHEN unique_violation THEN
+    -- Already exists, do nothing
+    NULL;
+END;
+$$ LANGUAGE plpgsql;
+
 -- Function to create a couple invitation, bypass RLS
 CREATE OR REPLACE FUNCTION create_couple_invitation(
   p_couple_id UUID,
@@ -69,5 +84,6 @@ $$ LANGUAGE plpgsql;
 -- Grant execution permissions to the service role
 GRANT EXECUTE ON FUNCTION get_user_by_passage_id TO service_role;
 GRANT EXECUTE ON FUNCTION get_couples_for_user TO service_role;
+GRANT EXECUTE ON FUNCTION create_couple_user_relation TO service_role;
 GRANT EXECUTE ON FUNCTION create_couple_invitation TO service_role;
 GRANT EXECUTE ON FUNCTION get_active_invitations TO service_role; 

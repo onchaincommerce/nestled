@@ -161,6 +161,34 @@ export default function Dashboard() {
                   } else {
                     console.log('User already registered in Supabase');
                   }
+                  
+                  // Now ensure user has a couple
+                  try {
+                    // API Key for direct access bypassing Passage auth
+                    const API_KEY = 'nestled-temp-api-key-12345';
+                    
+                    // Try to create/get couple
+                    const coupleResponse = await fetch('/api/couples/direct-create', {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${API_KEY}`
+                      },
+                      body: JSON.stringify({
+                        passageId: userInfo.id || userId,
+                        email: userInfo.email,
+                        phone: userInfo.phone
+                      })
+                    });
+                    
+                    if (!coupleResponse.ok) {
+                      console.error('Failed to create/get couple:', await coupleResponse.text());
+                    } else {
+                      console.log('Couple creation/fetch response:', await coupleResponse.json());
+                    }
+                  } catch (coupleError) {
+                    console.error('Error ensuring user has a couple:', coupleError);
+                  }
                 } catch (error) {
                   console.error('Error in direct user creation:', error);
                 }
