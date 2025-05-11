@@ -2,133 +2,146 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 
-// Initialize Supabase client with admin privileges
-const getAdminSupabase = () => {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-  );
-};
-
-// API Key for simple auth - should match what you set in the frontend
-const API_KEY = process.env.INVITE_API_KEY || 'nestled-temp-api-key-12345';
-
-// Create a direct invitation - bypasses Passage auth for testing
+// Super simplified approach that bypasses all RLS and complex logic
 export async function POST(request: NextRequest) {
   try {
-    // Check for basic API key auth
+    // API Key for simple validation
+    const API_KEY = process.env.INVITE_API_KEY || 'nestled-temp-api-key-12345';
+    
+    // Basic validation
     const authorization = request.headers.get('Authorization');
     const apiKey = authorization?.split(' ')[1];
     
     if (apiKey !== API_KEY) {
-      console.error(`Invalid API key: got "${apiKey}" expected "${API_KEY}"`);
-      return NextResponse.json(
-        { error: 'Invalid API key' },
-        { status: 401 }
-      );
+      console.error('Invalid API key');
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
-    // Get user ID from request body
-    const body = await request.json();
-    const { userId, coupleId } = body;
+    const { passageId, code, expiresInDays = 7 } = await request.json();
     
-    if (!userId || !coupleId) {
-      return NextResponse.json(
-        { error: 'Missing required fields: userId and coupleId are required' },
-        { status: 400 }
-      );
+    if (!passageId) {
+      return NextResponse.json({ error: 'Missing passageId' }, { status: 400 });
     }
     
-    console.log('Creating invitation for user:', userId, 'couple:', coupleId);
+    // Initialize Supabase with the service key to bypass RLS
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+    const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
     
-    const supabase = getAdminSupabase();
-    
-    // Find the user's Supabase UUID
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('id')
-      .eq('passage_id', userId)
-      .single();
-    
-    if (userError || !userData) {
-      console.error('Error finding user:', userError);
+    if (!supabaseUrl || !supabaseKey) {
       return NextResponse.json(
-        { error: 'User not found', details: { userError, userId } },
-        { status: 404 }
-      );
-    }
-    
-    const dbUserId = userData.id;
-    console.log('Found user ID in database:', dbUserId);
-    
-    // Verify the couple exists
-    const { data: coupleData, error: coupleError } = await supabase
-      .from('couples')
-      .select('id')
-      .eq('id', coupleId)
-      .single();
-    
-    if (coupleError || !coupleData) {
-      console.error('Error finding couple:', coupleError);
-      return NextResponse.json(
-        { error: 'Couple not found', details: coupleError },
-        { status: 404 }
-      );
-    }
-    
-    // Check if the user belongs to the couple
-    const { data: membershipData, error: membershipError } = await supabase
-      .from('couples_users')
-      .select('*')
-      .eq('couple_id', coupleId)
-      .eq('user_id', dbUserId)
-      .single();
-    
-    if (membershipError || !membershipData) {
-      console.error('User is not a member of this couple:', membershipError);
-      return NextResponse.json(
-        { error: 'User is not a member of this couple' },
-        { status: 403 }
-      );
-    }
-    
-    // Generate a unique invitation code
-    const inviteCode = crypto.randomBytes(3).toString('hex').toUpperCase();
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7); // Expire in 7 days
-    
-    // Insert the invitation directly with admin privileges
-    const { data: invitation, error: inviteError } = await supabase
-      .from('couple_invitations')
-      .insert({
-        code: inviteCode,
-        couple_id: coupleId,
-        created_by: dbUserId,
-        expires_at: expiresAt.toISOString()
-      })
-      .select()
-      .single();
-    
-    if (inviteError) {
-      console.error('Error creating invitation:', inviteError);
-      return NextResponse.json(
-        { error: 'Error creating invitation', details: inviteError },
+        { error: 'Server configuration error' }, 
         { status: 500 }
       );
     }
     
-    console.log('Invitation created successfully:', invitation);
+    // Create client with admin privileges
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      auth: { persistSession: false, autoRefreshToken: false }
+    });
+    
+    // 1. First get the user by passage_id
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('passage_id', passageId)
+      .single();
+    
+    if (userError || !userData) {
+      console.error('User not found:', userError);
+      return NextResponse.json(
+        { error: 'User not found', details: userError }, 
+        { status: 404 }
+      );
+    }
+    
+    const userId = userData.id;
+    
+    // 2. Check if user is in a couple already
+    const { data: coupleData, error: coupleError } = await supabase
+      .from('couples_users')
+      .select('couple_id')
+      .eq('user_id', userId)
+      .single();
+    
+    // If user is not in a couple, create one using raw SQL to bypass any RLS issues
+    let coupleId: string;
+    
+    if (coupleError || !coupleData) {
+      // Create a couple using raw SQL
+      const { data: newCouple, error: createError } = await supabase
+        .rpc('create_couple_for_user', {
+          p_user_id: userId
+        });
+      
+      if (createError || !newCouple) {
+        console.error('Failed to create couple:', createError);
+        return NextResponse.json(
+          { error: 'Failed to create couple', details: createError }, 
+          { status: 500 }
+        );
+      }
+      
+      coupleId = newCouple.id;
+    } else {
+      coupleId = coupleData.couple_id;
+    }
+    
+    // 3. Create the invitation directly
+    const finalCode = code || Math.random().toString(36).substring(2, 8).toUpperCase();
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + (expiresInDays || 7)); // 7 days by default
+    
+    // Create invitation with raw SQL to avoid RLS
+    const { data: invitation, error: inviteError } = await supabase
+      .rpc('create_direct_invitation', {
+        p_code: finalCode,
+        p_couple_id: coupleId,
+        p_created_by: userId,
+        p_expires_at: expiresAt.toISOString()
+      });
+    
+    if (inviteError) {
+      console.error('Failed to create invitation:', inviteError);
+      
+      // Fallback to direct insert if RPC fails
+      const { data: fallbackInvite, error: fallbackError } = await supabase
+        .from('couple_invitations')
+        .insert({
+          code: finalCode,
+          couple_id: coupleId,
+          created_by: userId,
+          expires_at: expiresAt.toISOString()
+        })
+        .select()
+        .single();
+      
+      if (fallbackError) {
+        return NextResponse.json(
+          { error: 'Failed to create invitation', details: fallbackError }, 
+          { status: 500 }
+        );
+      }
+      
+      return NextResponse.json({
+        success: true,
+        id: fallbackInvite.id,
+        code: finalCode,
+        couple_id: coupleId,
+        expires_at: expiresAt.toISOString()
+      });
+    }
     
     return NextResponse.json({
-      code: inviteCode,
-      coupleId: coupleId,
-      expiresAt: expiresAt.toISOString(),
-      inviteUrl: `${request.nextUrl.origin}/invite/${inviteCode}`
+      success: true,
+      id: invitation?.id,
+      code: finalCode,
+      couple_id: coupleId,
+      expires_at: expiresAt.toISOString()
     });
   } catch (error) {
-    console.error('Error in direct-invite endpoint:', error);
+    console.error('Unexpected error in direct-invite:', error);
     return NextResponse.json(
-      { error: (error as Error).message || 'Unknown error' },
+      { error: (error as Error).message || 'Unknown error' }, 
       { status: 500 }
     );
   }
