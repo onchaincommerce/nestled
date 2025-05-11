@@ -3,27 +3,37 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { PassageUser } from '@passageidentity/passage-elements/passage-user';
+import { PassageUserInterface } from '@/utils/passage-types';
 
 // This is a client component so we'll handle authentication on the client side
-// for the actual implementation, we'd use getServerSideProps to check authentication
 export default function Dashboard() {
   const router = useRouter();
   const [userName, setUserName] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [userID, setUserID] = useState('');
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [passageUser, setPassageUser] = useState<PassageUserInterface | null>(null);
 
   useEffect(() => {
     // Check if this is client-side
     if (typeof window !== 'undefined') {
-      // Check if the PassageUser element is defined
-      require('@passageidentity/passage-elements/passage-user');
-      
-      // Check authentication
-      const checkAuth = async () => {
+      // Load Passage and check auth
+      const loadPassage = async () => {
         try {
-          const passageUser = new PassageUser();
-          const isAuthorized = await passageUser.isAuthenticated();
+          // Check if the Passage global object is available
+          if (!window.Passage) {
+            console.error('Passage is not loaded yet');
+            router.push('/');
+            return;
+          }
+          
+          // Get the PassageUser class from the global Passage object
+          // @ts-ignore - We know this exists because we checked window.Passage
+          const PassageUser = window.Passage.PassageUser;
+          const user = new PassageUser() as PassageUserInterface;
+          setPassageUser(user);
+          
+          const isAuthorized = await user.isAuthenticated();
           
           if (!isAuthorized) {
             router.push('/');
@@ -31,7 +41,7 @@ export default function Dashboard() {
           }
           
           // User is authenticated, get their info
-          const userInfo = await passageUser.userInfo();
+          const userInfo = await user.userInfo();
           setUserName(userInfo.email || 'Partner');
           setUserID(userInfo.id || '');
           setIsLoading(false);
@@ -41,15 +51,21 @@ export default function Dashboard() {
         }
       };
       
-      checkAuth();
+      // Add a small delay to ensure Passage has time to initialize
+      const timer = setTimeout(() => {
+        loadPassage();
+      }, 500);
+      
+      return () => clearTimeout(timer);
     }
   }, [router]);
 
   const handleSignOut = async () => {
     try {
-      const passageUser = new PassageUser();
-      await passageUser.signOut();
-      router.push('/');
+      if (passageUser) {
+        await passageUser.signOut();
+        router.push('/');
+      }
     } catch (error) {
       console.error('Sign out error:', error);
     }
@@ -64,30 +80,16 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen flex flex-col bg-gray-50">
       {/* Dashboard Header */}
-      <header className="bg-white shadow">
-        <div className="container mx-auto p-4 flex justify-between items-center">
-          <div className="flex items-center space-x-2">
-            <span className="text-2xl font-bold text-primary-600">Nestled</span>
+      <header className="bg-white shadow-sm sticky top-0 z-10">
+        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+          <div className="flex items-center">
+            <span className="text-xl font-bold text-primary-700">Nestled</span>
           </div>
-          <nav className="flex space-x-6">
-            <Link href="/dashboard" className="text-primary-800 font-medium hover:text-primary-600">
-              Dashboard
-            </Link>
-            <Link href="/journal" className="text-gray-600 hover:text-primary-600">
-              Journal
-            </Link>
-            <Link href="/date-planner" className="text-gray-600 hover:text-primary-600">
-              Date Planner
-            </Link>
-            <Link href="/scrapbook" className="text-gray-600 hover:text-primary-600">
-              Scrapbook
-            </Link>
-          </nav>
           <div>
             <button 
-              className="px-4 py-2 rounded-lg bg-secondary-100 text-secondary-700 hover:bg-secondary-200 transition"
+              className="btn-secondary text-sm px-3 py-1"
               onClick={handleSignOut}
             >
               Sign out
@@ -97,24 +99,23 @@ export default function Dashboard() {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto py-8 px-4">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-800">Welcome, {userName}!</h1>
-          <p className="text-gray-600 mt-2">Here's what's happening in your relationship.</p>
-          <p className="text-xs text-gray-500 mt-1">User ID: {userID}</p>
+      <main className="flex-1 container mx-auto py-6 px-4">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-800">Welcome, {userName}!</h1>
+          <p className="text-gray-600 text-sm mt-1">Here's what's happening in your relationship.</p>
         </div>
 
         {/* Dashboard Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
           {/* Journal Card */}
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <div className="flex justify-between items-start mb-4">
-              <h2 className="text-xl font-semibold text-primary-800">Today's Journal</h2>
-              <span className="text-sm bg-primary-100 text-primary-700 px-2 py-1 rounded-full">Daily</span>
+          <div className="card">
+            <div className="flex justify-between items-start mb-3">
+              <h2 className="text-lg font-semibold text-primary-800">Today's Journal</h2>
+              <span className="text-xs bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full">Daily</span>
             </div>
-            <p className="text-gray-600 mb-4">What would be your perfect day?</p>
-            <div className="flex justify-between">
-              <div className="text-sm text-gray-500">
+            <p className="text-gray-600 mb-4 text-sm">What would be your perfect day?</p>
+            <div className="flex justify-between items-center">
+              <div className="text-xs text-gray-500">
                 <span className="font-medium">Status:</span> Waiting for responses
               </div>
               <Link href="/journal" className="text-primary-600 hover:text-primary-800 font-medium text-sm">
@@ -124,12 +125,12 @@ export default function Dashboard() {
           </div>
 
           {/* Date Planner Card */}
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <div className="flex justify-between items-start mb-4">
-              <h2 className="text-xl font-semibold text-primary-800">Upcoming Date</h2>
-              <span className="text-sm bg-secondary-100 text-secondary-700 px-2 py-1 rounded-full">Next Week</span>
+          <div className="card">
+            <div className="flex justify-between items-start mb-3">
+              <h2 className="text-lg font-semibold text-primary-800">Upcoming Date</h2>
+              <span className="text-xs bg-secondary-100 text-secondary-700 px-2 py-0.5 rounded-full">Next Week</span>
             </div>
-            <p className="text-gray-600 mb-4">No dates planned yet. Create your first date!</p>
+            <p className="text-gray-600 mb-4 text-sm">No dates planned yet. Create your first date!</p>
             <div className="flex justify-end">
               <Link href="/date-planner" className="text-primary-600 hover:text-primary-800 font-medium text-sm">
                 Plan a date →
@@ -138,12 +139,12 @@ export default function Dashboard() {
           </div>
 
           {/* Scrapbook Card */}
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <div className="flex justify-between items-start mb-4">
-              <h2 className="text-xl font-semibold text-primary-800">Recent Memories</h2>
-              <span className="text-sm bg-primary-100 text-primary-700 px-2 py-1 rounded-full">Scrapbook</span>
+          <div className="card">
+            <div className="flex justify-between items-start mb-3">
+              <h2 className="text-lg font-semibold text-primary-800">Recent Memories</h2>
+              <span className="text-xs bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full">Scrapbook</span>
             </div>
-            <p className="text-gray-600 mb-4">Start adding photos and memories to your scrapbook.</p>
+            <p className="text-gray-600 mb-4 text-sm">Start adding photos and memories to your scrapbook.</p>
             <div className="flex justify-end">
               <Link href="/scrapbook" className="text-primary-600 hover:text-primary-800 font-medium text-sm">
                 Add memory →
@@ -153,15 +154,43 @@ export default function Dashboard() {
         </div>
 
         {/* Activity Feed */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h2 className="text-xl font-semibold text-primary-800 mb-4">Activity Feed</h2>
+        <div className="card mb-6">
+          <h2 className="text-lg font-semibold text-primary-800 mb-4">Activity Feed</h2>
           <div className="space-y-4">
-            <p className="text-gray-500 text-center py-8">
+            <p className="text-gray-500 text-center py-4 text-sm">
               Your activity feed will show up here once you start using Nestled.
             </p>
           </div>
         </div>
       </main>
+
+      {/* Mobile Navigation */}
+      <nav className="sticky bottom-0 bg-white border-t border-gray-200 px-4 py-3 flex justify-around items-center">
+        <Link href="/dashboard" className={`flex flex-col items-center ${activeTab === 'dashboard' ? 'text-primary-600' : 'text-gray-500'}`} onClick={() => setActiveTab('dashboard')}>
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+          </svg>
+          <span className="text-xs mt-1">Home</span>
+        </Link>
+        <Link href="/journal" className={`flex flex-col items-center ${activeTab === 'journal' ? 'text-primary-600' : 'text-gray-500'}`} onClick={() => setActiveTab('journal')}>
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          </svg>
+          <span className="text-xs mt-1">Journal</span>
+        </Link>
+        <Link href="/date-planner" className={`flex flex-col items-center ${activeTab === 'date-planner' ? 'text-primary-600' : 'text-gray-500'}`} onClick={() => setActiveTab('date-planner')}>
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          <span className="text-xs mt-1">Dates</span>
+        </Link>
+        <Link href="/scrapbook" className={`flex flex-col items-center ${activeTab === 'scrapbook' ? 'text-primary-600' : 'text-gray-500'}`} onClick={() => setActiveTab('scrapbook')}>
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          <span className="text-xs mt-1">Memories</span>
+        </Link>
+      </nav>
     </div>
   );
 } 

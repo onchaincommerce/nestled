@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // Define an array of paths that require authentication
-const PROTECTED_PATHS = ['/dashboard', '/journal', '/scrapbook', '/date-planner'];
+const PROTECTED_PATHS = ['/dashboard', '/journal', '/scrapbook', '/date-planner', '/welcome'];
 
 // Define an array of paths that should be accessible only to non-authenticated users
 const AUTH_PATHS = ['/login', '/signup', '/'];
@@ -18,9 +18,9 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/', request.url));
   }
   
-  // For auth paths, redirect to dashboard if the user is already authenticated
+  // For auth paths, redirect to welcome page if the user is already authenticated
   if (AUTH_PATHS.includes(pathname) && hasAuthToken) {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
+    return NextResponse.redirect(new URL('/welcome', request.url));
   }
   
   return NextResponse.next();
