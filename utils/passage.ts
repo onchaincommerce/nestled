@@ -56,9 +56,11 @@ export const getAuthenticatedUser = async (req: any) => {
     const authToken = getAuthToken(req);
     
     if (!authToken) {
+      console.log('No auth token found in request');
       return { isAuthorized: false, userID: null };
     }
     
+    console.log('Auth token found, creating compatible request');
     // App Router doesn't provide the same request object as Pages Router
     // We need to create a compatible request object
     const compatReq = {
@@ -71,9 +73,11 @@ export const getAuthenticatedUser = async (req: any) => {
     };
     
     try {
+      console.log('Authenticating request with Passage');
       const userID = await passage.authenticateRequest(compatReq);
       
       if (userID) {
+        console.log('Authentication successful, getting user info for ID:', userID);
         const user = await passage.user.get(userID);
         return { 
           isAuthorized: true, 

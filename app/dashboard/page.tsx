@@ -72,6 +72,7 @@ export default function Dashboard() {
               
               // Register user in Supabase database
               try {
+                console.log('Attempting to register user with ID:', userInfo.id);
                 const response = await fetch('/api/auth', {
                   method: 'POST',
                   headers: {
@@ -80,9 +81,12 @@ export default function Dashboard() {
                 });
                 
                 if (!response.ok) {
-                  console.error('Failed to register user in Supabase');
+                  console.error('Failed to register user in Supabase, status:', response.status);
+                  const errorData = await response.text();
+                  console.error('Error response:', errorData);
                 } else {
-                  console.log('User successfully registered in Supabase');
+                  const responseData = await response.json();
+                  console.log('User successfully registered in Supabase:', responseData);
                 }
               } catch (error) {
                 console.error('Error registering user in Supabase:', error);
