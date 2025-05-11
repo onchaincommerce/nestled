@@ -124,23 +124,34 @@ export default function Dashboard() {
                 // Register user in Supabase database using direct API call
                 // This is more reliable than relying on the auth token
                 try {
-                  const directResponse = await fetch('/api/direct-create-user', {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                      userId: userInfo.id || userId,
-                      email: userInfo.email,
-                      phone: userInfo.phone
-                    })
-                  });
+                  // Check localStorage to see if we've already tried to create this user
+                  const userRegistered = localStorage.getItem(`user_registered_${userInfo.id}`);
                   
-                  if (!directResponse.ok) {
-                    console.error('Failed direct user creation:', await directResponse.text());
+                  if (!userRegistered) {
+                    console.log('First login for user, registering in Supabase');
+                    const directResponse = await fetch('/api/direct-create-user', {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({
+                        userId: userInfo.id || userId,
+                        email: userInfo.email,
+                        phone: userInfo.phone
+                      })
+                    });
+                    
+                    if (!directResponse.ok) {
+                      console.error('Failed direct user creation:', await directResponse.text());
+                    } else {
+                      const responseData = await directResponse.json();
+                      console.log('Direct user creation response:', responseData);
+                      
+                      // Mark this user as registered so we don't try again
+                      localStorage.setItem(`user_registered_${userInfo.id}`, 'true');
+                    }
                   } else {
-                    const responseData = await directResponse.json();
-                    console.log('Direct user creation response:', responseData);
+                    console.log('User already registered in Supabase');
                   }
                 } catch (error) {
                   console.error('Error in direct user creation:', error);

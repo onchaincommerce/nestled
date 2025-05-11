@@ -3,6 +3,13 @@ CREATE OR REPLACE FUNCTION public.user_id() RETURNS TEXT AS $$
   SELECT nullif(current_setting('request.jwt.claims', true)::json->>'userId', '')::text;
 $$ LANGUAGE sql STABLE;
 
+-- Add passage_id and phone columns to users table - using explicit ALTER TABLE statements
+ALTER TABLE users ADD COLUMN IF NOT EXISTS passage_id TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT;
+
+-- Add an index on passage_id for faster lookups
+CREATE INDEX IF NOT EXISTS users_passage_id_idx ON users(passage_id);
+
 -- Drop the current INSERT policy
 DROP POLICY IF EXISTS "Allow public insert for new users" ON users;
 
@@ -26,10 +33,13 @@ ON users
 FOR SELECT 
 USING (true);  -- Allow anyone to view user data
 
--- Create a function to bypass RLS for inserting users
+-- Create or replace the function to bypass RLS for inserting users with new fields
 CREATE OR REPLACE FUNCTION insert_user_bypass_rls(
   user_id UUID,
   user_username TEXT,
+  passage_user_id TEXT DEFAULT NULL,
+  user_email TEXT DEFAULT NULL,
+  user_phone TEXT DEFAULT NULL,
   created_at_time TIMESTAMPTZ DEFAULT now(),
   updated_at_time TIMESTAMPTZ DEFAULT now()
 ) RETURNS BOOLEAN AS $$
@@ -37,12 +47,13 @@ DECLARE
   success BOOLEAN;
 BEGIN
   -- Use SECURITY DEFINER to bypass RLS
-  INSERT INTO users (id, username, created_at, updated_at)
-  VALUES (user_id, user_username, created_at_time, updated_at_time);
+  INSERT INTO users (id, username, passage_id, email, phone, created_at, updated_at)
+  VALUES (user_id, user_username, passage_user_id, user_email, user_phone, created_at_time, updated_at_time);
   
   success := FOUND;
   RETURN success;
 EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'Error in insert_user_bypass_rls: %', SQLERRM;
   RETURN FALSE;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

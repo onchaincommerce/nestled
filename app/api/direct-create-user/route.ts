@@ -7,18 +7,24 @@ export async function POST(request: Request) {
     // Try to authenticate via Passage first
     const { isAuthorized, userID } = await getAuthenticatedUser(request);
     let userId = userID;
+    let email = null;
+    let phone = null;
     
-    // If Passage auth fails, try to get userId from request body
+    // If Passage auth fails or to supplement with additional data, try request body
+    const body = await request.json().catch(() => ({}));
     if (!userId) {
-      const { userId: bodyUserId, email, phone } = await request.json();
-      userId = bodyUserId;
-      
-      if (!userId) {
-        return NextResponse.json(
-          { error: 'Missing required userId field' },
-          { status: 400 }
-        );
-      }
+      userId = body.userId;
+    }
+    
+    // Get email and phone if available
+    email = body.email || null;
+    phone = body.phone || null;
+    
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Missing required userId field' },
+        { status: 400 }
+      );
     }
     
     console.log('Attempting to directly create user with ID:', userId);
@@ -29,19 +35,36 @@ export async function POST(request: Request) {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
     );
     
-    // Check if user already exists
-    const { data: existingUser, error: userCheckError } = await supabase
+    // Check if user already exists - by Passage ID first
+    const { data: existingUserByPassageId, error: passageIdError } = await supabase
       .from('users')
-      .select('id, email, username')
-      .eq('id', userId)
+      .select('id, email, username, passage_id, phone')
+      .eq('passage_id', userId)
       .single();
-    
-    if (existingUser) {
-      console.log('User already exists:', existingUser);
+      
+    if (existingUserByPassageId) {
+      console.log('User already exists by Passage ID:', existingUserByPassageId);
       return NextResponse.json({ 
         message: 'User already exists',
-        user: existingUser
+        user: existingUserByPassageId
       });
+    }
+    
+    // Then try by UUID if it's a UUID format
+    if (userId.length === 36 && userId.includes('-')) {
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('id, email, username, passage_id, phone')
+        .eq('id', userId)
+        .single();
+        
+      if (existingUser) {
+        console.log('User already exists by UUID:', existingUser);
+        return NextResponse.json({ 
+          message: 'User already exists',
+          user: existingUser
+        });
+      }
     }
     
     // Try an alternate approach: use direct SQL if we have service_role access
@@ -57,22 +80,18 @@ export async function POST(request: Request) {
         );
         
         // Generate an appropriate UUID
-        let idToUse = userId;
-        try {
-          if (userId.length !== 36 || !userId.includes('-')) {
-            idToUse = crypto.randomUUID();
-          }
-        } catch (e) {
-          idToUse = crypto.randomUUID();
-        }
-        
+        // Passage ID is not a UUID, so generate a UUID for the primary key
+        const uuid = crypto.randomUUID();
         const timestamp = new Date().toISOString();
         
         // Execute a direct SQL insert that bypasses RLS
         const { data: sqlData, error: sqlError } = await adminSupabase
           .rpc('insert_user_bypass_rls', { 
-            user_id: idToUse,
-            user_username: `user_${idToUse.substring(0, 8)}`,
+            user_id: uuid,
+            user_username: `user_${uuid.substring(0, 8)}`,
+            passage_user_id: userId,
+            user_email: email,
+            user_phone: phone,
             created_at_time: timestamp,
             updated_at_time: timestamp
           });
@@ -83,8 +102,8 @@ export async function POST(request: Request) {
           // Fetch the newly created user
           const { data: newUser } = await adminSupabase
             .from('users')
-            .select('id, email, username')
-            .eq('id', idToUse)
+            .select('id, email, username, passage_id, phone')
+            .eq('id', uuid)
             .single();
             
           return NextResponse.json({
@@ -99,28 +118,16 @@ export async function POST(request: Request) {
       console.error('Error with service_role approach:', adminError);
     }
     
-    // If service_role approach failed, continue with original method
-    // Generate a valid UUID if the provided ID isn't already a UUID
-    // Note that Passage IDs may not be valid UUIDs, which could cause insertion errors
-    let idToUse = userId;
-    try {
-      // Simple validation: UUIDs should be 36 characters with dashes
-      if (userId.length !== 36 || !userId.includes('-')) {
-        console.log('Provided ID is not a valid UUID, using generated one instead');
-        idToUse = crypto.randomUUID();
-      }
-    } catch (e) {
-      console.log('Error validating UUID, using generated one instead');
-      idToUse = crypto.randomUUID();
-    }
+    // Generate a valid UUID for the database primary key
+    const idToUse = crypto.randomUUID();
     
-    // Create the user
-    console.log('Creating user with ID:', idToUse);
-    
-    // Form the user data object
+    // Form the user data object with passage_id and phone
     const userData = {
       id: idToUse,
-      username: `user_${idToUse.substring(0, 8)}`
+      username: `user_${idToUse.substring(0, 8)}`,
+      passage_id: userId,  // Store original Passage ID
+      email: email,
+      phone: phone
     };
     
     // Insert with error handling
@@ -136,7 +143,7 @@ export async function POST(request: Request) {
       if (createError.code === '23505') {
         const { data: dupeUser } = await supabase
           .from('users')
-          .select('id, email, username')
+          .select('id, email, username, passage_id, phone')
           .eq('id', idToUse)
           .single();
           
