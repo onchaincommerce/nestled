@@ -49,52 +49,106 @@ export default function Dashboard() {
             const user = new PassageUser();
             setPassageUser(user);
             
-            // Check if auth methods exist
-            if (typeof user.isAuthenticated !== 'function') {
-              console.error('isAuthenticated method not found');
-              setIsLoading(false);
-              return;
-            }
+            // Try to get user info without requiring isAuthenticated
+            // This is more reliable in some cases
+            let userInfo;
+            let userId;
+            let userAuthorized = false;
             
-            const isAuthorized = await user.isAuthenticated();
-            
-            if (!isAuthorized) {
-              console.log('User is not authenticated, redirecting...');
-              router.push('/');
-              return;
-            }
-            
-            // User is authenticated, get basic info
-            if (typeof user.userInfo === 'function') {
-              const userInfo = await user.userInfo();
-              setUserName(userInfo.email || userInfo.phone || 'Partner');
-              setUserID(userInfo.id || '');
-              
-              // Get the auth token
-              const authToken = await user.getAuthToken();
-              
-              // Register user in Supabase database
-              try {
-                console.log('Attempting to register user with ID:', userInfo.id);
-                const response = await fetch('/api/auth', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${authToken}`
-                  },
-                });
+            // Try different ways to get auth status
+            try {
+              if (typeof user.isAuthenticated === 'function') {
+                userAuthorized = await user.isAuthenticated();
+                console.log('Used isAuthenticated method, result:', userAuthorized);
+              } else {
+                console.log('isAuthenticated method not found, trying alternative methods');
                 
-                if (!response.ok) {
-                  console.error('Failed to register user in Supabase, status:', response.status);
-                  const errorData = await response.text();
-                  console.error('Error response:', errorData);
+                // Alternative: Try to get user info directly
+                if (typeof user.userInfo === 'function') {
+                  userInfo = await user.userInfo();
+                  if (userInfo && userInfo.id) {
+                    console.log('Got user info directly:', userInfo);
+                    userAuthorized = true;
+                    userId = userInfo.id;
+                  }
                 } else {
-                  const responseData = await response.json();
-                  console.log('User successfully registered in Supabase:', responseData);
+                  console.error('userInfo method not found either');
+                  
+                  // Final attempt: Try to get token directly
+                  if (typeof user.getAuthToken === 'function') {
+                    const token = await user.getAuthToken();
+                    if (token) {
+                      console.log('Got auth token, user is logged in');
+                      userAuthorized = true;
+                      
+                      // Make a direct call to our API to get user info
+                      const response = await fetch('/api/direct-create-user', {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({
+                          userAgent: navigator.userAgent
+                        })
+                      });
+                      
+                      if (response.ok) {
+                        const data = await response.json();
+                        if (data.user && data.user.id) {
+                          userId = data.user.id;
+                        }
+                      }
+                    }
+                  } else {
+                    console.error('getAuthToken method not found, cannot authenticate');
+                  }
                 }
-              } catch (error) {
-                console.error('Error registering user in Supabase:', error);
               }
+              
+              if (!userAuthorized) {
+                console.log('User is not authenticated, redirecting...');
+                router.push('/');
+                return;
+              }
+              
+              // User is authenticated, get basic info
+              if (!userInfo && typeof user.userInfo === 'function') {
+                userInfo = await user.userInfo();
+              }
+              
+              if (userInfo) {
+                setUserName(userInfo.email || userInfo.phone || 'Partner');
+                setUserID(userInfo.id || userId || '');
+                
+                // Register user in Supabase database using direct API call
+                // This is more reliable than relying on the auth token
+                try {
+                  const directResponse = await fetch('/api/direct-create-user', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      userId: userInfo.id || userId,
+                      email: userInfo.email,
+                      phone: userInfo.phone
+                    })
+                  });
+                  
+                  if (!directResponse.ok) {
+                    console.error('Failed direct user creation:', await directResponse.text());
+                  } else {
+                    const responseData = await directResponse.json();
+                    console.log('Direct user creation response:', responseData);
+                  }
+                } catch (error) {
+                  console.error('Error in direct user creation:', error);
+                }
+              }
+            } catch (authMethodError) {
+              console.error('Error checking auth status:', authMethodError);
+              setIsLoading(false);
             }
           } catch (error) {
             console.error('Auth error, but continuing:', error);
