@@ -96,51 +96,45 @@ export default function InvitePartnerModal({
       
       console.error('Standard API failed, status:', response.status, 'trying fallback...');
       
-      // If that fails, try the direct API with the couple ID and API key
-      // First, get the couple ID for this user
-      const coupleUrl = addApiKeyToUrl(`/api/couples/direct?passageId=${userID}`);
-      const coupleResponse = await fetch(coupleUrl, {
+      // Use the new auth-bypass endpoint as a fallback
+      const authBypassUrl = addApiKeyToUrl(`/api/couples/auth-bypass?passageId=${userID}`);
+      const bypassResponse = await fetch(authBypassUrl, {
         headers: {
           'Authorization': `Bearer ${API_KEY}`,
           'Content-Type': 'application/json'
         }
       });
       
-      if (!coupleResponse.ok) {
-        console.error('Failed to get couple data:', await coupleResponse.text());
+      if (!bypassResponse.ok) {
+        console.error('Failed to get couple data:', await bypassResponse.text());
         setError('Failed to load couple data');
         setIsLoading(false);
         return;
       }
       
-      const coupleData = await coupleResponse.json();
-      if (!coupleData.couples || coupleData.couples.length === 0) {
-        console.error('No couples found for user');
-        setError('You are not part of any couple yet');
-        setIsLoading(false);
-        return;
-      }
-      
-      const coupleId = coupleData.couples[0].id;
-      
-      // Now call the direct API
-      const inviteUrl = addApiKeyToUrl(`/api/couples/direct-invite?coupleId=${coupleId}`);
-      const directResponse = await fetch(inviteUrl, {
+      // Now get the invitations using the new API
+      const inviteBypassUrl = addApiKeyToUrl(`/api/couples/auth-bypass`);
+      const inviteResponse = await fetch(inviteBypassUrl, {
+        method: 'POST',
         headers: {
           'Authorization': `Bearer ${API_KEY}`,
           'Content-Type': 'application/json'
-        }
+        },
+        body: JSON.stringify({
+          passageId: userID,
+          action: 'get_invitations'
+        })
       });
       
-      if (!directResponse.ok) {
-        console.error('Direct API failed:', await directResponse.text());
+      if (!inviteResponse.ok) {
+        console.error('Invitations API failed:', await inviteResponse.text());
         setError('Failed to load invitations');
         setIsLoading(false);
         return;
       }
       
-      const directData = await directResponse.json();
-      setInvitations(directData.invitations || []);
+      const inviteData = await inviteResponse.json();
+      setInvitations(inviteData.invitations || []);
     } catch (error) {
       console.error('Error loading invitations:', error);
       setError('Failed to load invitations');
@@ -173,54 +167,35 @@ export default function InvitePartnerModal({
       
       console.error('Standard API POST failed, status:', response.status, 'trying fallback...');
       
-      // If that fails, try the direct API with the couple ID and API key
-      // First, get the couple ID for this user
-      const coupleUrl = addApiKeyToUrl(`/api/couples/direct?passageId=${userID}`);
-      const coupleResponse = await fetch(coupleUrl, {
+      // Use the new auth-bypass endpoint to create the invitation
+      const authBypassUrl = addApiKeyToUrl(`/api/couples/auth-bypass`);
+      const bypassResponse = await fetch(authBypassUrl, {
+        method: 'POST',
         headers: {
           'Authorization': `Bearer ${API_KEY}`,
           'Content-Type': 'application/json'
-        }
-      });
-      
-      if (!coupleResponse.ok) {
-        setError('Failed to get couple data');
-        return;
-      }
-      
-      const coupleData = await coupleResponse.json();
-      if (!coupleData.couples || coupleData.couples.length === 0) {
-        setError('You are not part of any couple yet');
-        return;
-      }
-      
-      const coupleId = coupleData.couples[0].id;
-      
-      // Now call the direct API
-      const inviteUrl = addApiKeyToUrl('/api/couples/direct-invite');
-      const directResponse = await fetch(inviteUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${API_KEY}`
         },
         body: JSON.stringify({
-          userId: userID,
-          coupleId: coupleId
+          passageId: userID,
+          action: 'create_invitation'
         })
       });
       
-      if (!directResponse.ok) {
-        const errorText = await directResponse.text();
-        console.error('Direct API failed:', errorText);
+      if (!bypassResponse.ok) {
+        const errorText = await bypassResponse.text();
+        console.error('Auth bypass API failed:', errorText);
         setError(`Failed to create invitation: ${errorText}`);
         return;
       }
       
-      const directData = await directResponse.json();
-      setSuccess('Invitation created successfully');
-      // Reload invitations
-      await loadInvitations();
+      const inviteData = await bypassResponse.json();
+      if (inviteData.success) {
+        setSuccess('Invitation created successfully');
+        // Reload invitations
+        await loadInvitations();
+      } else {
+        setError('Failed to create invitation');
+      }
     } catch (error) {
       setError('An unexpected error occurred');
       console.error('Error creating invitation:', error);
