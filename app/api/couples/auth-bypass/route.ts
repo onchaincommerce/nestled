@@ -4,10 +4,20 @@ import crypto from 'crypto';
 
 // Initialize Supabase client with admin/service role privileges
 const getServiceSupabase = () => {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.SUPABASE_SERVICE_KEY || ''
-  );
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+  
+  if (!supabaseUrl) {
+    throw new Error('supabaseUrl is required.');
+  }
+  
+  if (!supabaseKey) {
+    throw new Error('supabaseKey is required.');
+  }
+  
+  console.log('Initializing Supabase with service role');
+  
+  return createClient(supabaseUrl, supabaseKey);
 };
 
 // API Key for simple auth - should match what you set in the frontend
