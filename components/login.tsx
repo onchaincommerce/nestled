@@ -15,9 +15,17 @@ const PassageLogin = () => {
   useEffect(() => {
     setIsClient(true);
     
-    // Load Passage auth element directly
+    // Load the Passage SDK and elements
     if (typeof window !== 'undefined') {
+      // First, load the Passage elements (this creates the custom element)
       require('@passageidentity/passage-elements/passage-auth');
+      
+      // Also load the Passage JS SDK to ensure window.Passage is available
+      import('@passageidentity/passage-js').then(() => {
+        console.log('Passage SDK loaded successfully');
+      }).catch(err => {
+        console.error('Error loading Passage SDK:', err);
+      });
     }
   }, []);
 

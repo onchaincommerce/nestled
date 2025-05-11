@@ -7,6 +7,7 @@ import PassageLogin from '@/components/login';
 
 export default function Home() {
   const [isClient, setIsClient] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
@@ -23,27 +24,43 @@ export default function Home() {
             return; // Will retry on next interval
           }
           
+          console.log('Passage found, checking authentication');
           const PassageUser = window.Passage.PassageUser;
           const user = new PassageUser();
-          const isAuthorized = await user.isAuthenticated();
           
-          if (isAuthorized) {
-            // User is already authenticated, redirect to dashboard
-            router.push('/dashboard');
+          try {
+            const isAuthorized = await user.isAuthenticated();
+            console.log('Authentication check result:', isAuthorized);
+            
+            if (isAuthorized) {
+              // User is already authenticated, redirect to dashboard
+              router.push('/dashboard');
+            } else {
+              // User is not authenticated, stop checking
+              setIsCheckingAuth(false);
+            }
+          } catch (authError) {
+            console.error('Authentication check failed:', authError);
+            setIsCheckingAuth(false);
           }
         }
       } catch (error) {
         console.error('Auth check error:', error);
-        // Just log the error and continue showing the login page
+        setIsCheckingAuth(false);
       }
     };
     
-    // Try to check auth every second until Passage is loaded
-    const intervalId = setInterval(checkAuth, 1000);
+    // Try to check auth every second until either authenticated 
+    // or we confirm not authenticated
+    const intervalId = setInterval(() => {
+      if (isCheckingAuth) {
+        checkAuth();
+      }
+    }, 1000);
     
     // Clean up the interval on unmount
     return () => clearInterval(intervalId);
-  }, [router]);
+  }, [router, isCheckingAuth]);
 
   return (
     <main className="min-h-screen flex flex-col">
