@@ -1,20 +1,20 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import PwaProvider from "@/components/pwa-provider";
 
 export const metadata: Metadata = {
   title: "Nestled - Shared Journal & Memory App for Couples",
   description: "A private, delightful space for couples to journal together, plan dates, and curate a shared scrapbook.",
   manifest: "/manifest.json",
-  themeColor: "#EF6F6C",
+  themeColor: "#5571F5",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
     title: "Nestled"
   },
   icons: {
-    icon: "data:image/svg+xml,%3Csvg%20width%3D%22192%22%20height%3D%22192%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Crect%20width%3D%22192%22%20height%3D%22192%22%20fill%3D%22%23EF6F6C%22%20rx%3D%2220%25%22%20ry%3D%2220%25%22%20%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20dominant-baseline%3D%22middle%22%20text-anchor%3D%22middle%22%20font-family%3D%22Arial%22%20font-weight%3D%22bold%22%20font-size%3D%2276.8%22%20fill%3D%22white%22%3EN%3C%2Ftext%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2270%25%22%20dominant-baseline%3D%22middle%22%20text-anchor%3D%22middle%22%20font-family%3D%22Arial%22%20font-size%3D%2219.2%22%20fill%3D%22white%22%3ENestled%3C%2Ftext%3E%3C%2Fsvg%3E",
-    apple: "data:image/svg+xml,%3Csvg%20width%3D%22192%22%20height%3D%22192%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Crect%20width%3D%22192%22%20height%3D%22192%22%20fill%3D%22%23EF6F6C%22%20rx%3D%2220%25%22%20ry%3D%2220%25%22%20%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20dominant-baseline%3D%22middle%22%20text-anchor%3D%22middle%22%20font-family%3D%22Arial%22%20font-weight%3D%22bold%22%20font-size%3D%2276.8%22%20fill%3D%22white%22%3EN%3C%2Ftext%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2270%25%22%20dominant-baseline%3D%22middle%22%20text-anchor%3D%22middle%22%20font-family%3D%22Arial%22%20font-size%3D%2219.2%22%20fill%3D%22white%22%3ENestled%3C%2Ftext%3E%3C%2Fsvg%3E"
+    icon: "/icons/favicon.ico",
+    shortcut: "/icons/favicon-16x16.png",
+    apple: "/icons/apple-touch-icon.png",
   }
 };
 
@@ -30,13 +30,14 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="Nestled" />
-        <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg%20width%3D%22192%22%20height%3D%22192%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Crect%20width%3D%22192%22%20height%3D%22192%22%20fill%3D%22%23EF6F6C%22%20rx%3D%2220%25%22%20ry%3D%2220%25%22%20%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20dominant-baseline%3D%22middle%22%20text-anchor%3D%22middle%22%20font-family%3D%22Arial%22%20font-weight%3D%22bold%22%20font-size%3D%2276.8%22%20fill%3D%22white%22%3EN%3C%2Ftext%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2270%25%22%20dominant-baseline%3D%22middle%22%20text-anchor%3D%22middle%22%20font-family%3D%22Arial%22%20font-size%3D%2219.2%22%20fill%3D%22white%22%3ENestled%3C%2Ftext%3E%3C%2Fsvg%3E" />
+        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+        <link rel="icon" href="/icons/favicon.ico" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png" />
         <script src="https://cdn.passage.id/passage-web.js"></script>
       </head>
-      <body className="min-h-screen bg-gray-50 text-gray-900">
-        <PwaProvider>
-          {children}
-        </PwaProvider>
+      <body className="min-h-screen text-gray-900">
+        {children}
       </body>
     </html>
   );

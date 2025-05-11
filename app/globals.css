@@ -6,8 +6,9 @@
 
 :root {
   --foreground-rgb: 26, 24, 30;
-  --background-start-rgb: 245, 247, 255;
-  --background-end-rgb: 253, 248, 246;
+  --background-start-rgb: 241, 245, 249;
+  --background-end-rgb: 248, 250, 252;
+  --card-bg: 252, 254, 255;
 }
 
 * {
@@ -35,10 +36,10 @@ body {
 
 @layer base {
   h1 {
-    @apply text-3xl font-bold mb-4;
+    @apply text-3xl font-bold mb-3;
   }
   h2 {
-    @apply text-2xl font-bold mb-3;
+    @apply text-2xl font-bold mb-2;
   }
   h3 {
     @apply text-xl font-semibold mb-2;
@@ -50,15 +51,27 @@ body {
 
 @layer components {
   .btn-primary {
-    @apply bg-primary-600 text-white px-5 py-3 rounded-lg hover:bg-primary-700 transition-colors font-medium shadow-sm;
+    @apply bg-primary-600 text-white px-5 py-2.5 rounded-2xl hover:bg-primary-700 transition-colors font-medium shadow-sm;
   }
   .btn-secondary {
-    @apply bg-secondary-100 text-secondary-700 px-5 py-3 rounded-lg hover:bg-secondary-200 transition-colors font-medium shadow-sm;
+    @apply bg-secondary-100 text-secondary-700 px-5 py-2.5 rounded-2xl hover:bg-secondary-200 transition-colors font-medium shadow-sm;
   }
   .card {
-    @apply bg-white rounded-xl shadow-sm border border-gray-100 p-6;
+    @apply bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-100/60 p-4 hover:shadow-md transition-shadow;
   }
   .container {
-    @apply mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl;
+    @apply mx-auto px-3 sm:px-4 lg:px-6 max-w-6xl;
+  }
+  
+  .dot-pattern {
+    @apply relative;
+  }
+  .dot-pattern::before {
+    content: "";
+    @apply absolute -z-10 top-0 right-0 w-64 h-64 bg-primary-100 rounded-full opacity-50 blur-3xl;
+  }
+  .dot-pattern::after {
+    content: "";
+    @apply absolute -z-10 bottom-0 left-0 w-64 h-64 bg-secondary-100 rounded-full opacity-50 blur-3xl;
   }
 }
