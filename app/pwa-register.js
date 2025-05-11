@@ -3,29 +3,32 @@
 export function registerServiceWorker() {
   if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
     window.addEventListener('load', function() {
-      // Unregister any existing service workers first
+      // First unregister any existing service workers
       navigator.serviceWorker.getRegistrations().then(function(registrations) {
-        for(let registration of registrations) {
-          console.log('Unregistering existing service worker');
-          registration.unregister().then(function(success) {
-            if (success) {
-              console.log('Service worker unregistered successfully');
-            }
-          });
-        }
+        // Force unregister all existing service workers
+        const unregisterPromises = registrations.map(registration => {
+          console.log('Unregistering service worker:', registration.scope);
+          return registration.unregister();
+        });
         
-        // After a short delay, register the new service worker
-        setTimeout(() => {
-          navigator.serviceWorker.register('/sw.js', {
-            updateViaCache: 'none' // Don't use cached version
+        // Wait for all unregistrations to complete
+        Promise.all(unregisterPromises).then(() => {
+          console.log('All service workers unregistered successfully');
+          
+          // Now register the new service worker with no caching
+          navigator.serviceWorker.register('/sw.js?v=' + Date.now(), {
+            updateViaCache: 'none'
           })
             .then(function(registration) {
               console.log('Service Worker registered with scope:', registration.scope);
+              
+              // Force update
+              registration.update();
             })
             .catch(function(error) {
               console.error('Service Worker registration failed:', error);
             });
-        }, 1000);
+        });
       });
     });
   }
@@ -43,7 +46,6 @@ export function setupPwaInstallPrompt() {
       deferredPrompt = e;
       
       // Optionally, show your own install button or UI element
-      // You could update UI to show a "Install PWA" button
       console.log('App can be installed, showing install prompt');
     });
 

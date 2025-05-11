@@ -8,7 +8,7 @@ import { PassageUserInterface } from '@/utils/passage-types';
 // This is a client component so we'll handle authentication on the client side
 export default function Dashboard() {
   const router = useRouter();
-  const [userName, setUserName] = useState('');
+  const [userName, setUserName] = useState('Partner');
   const [isLoading, setIsLoading] = useState(true);
   const [userID, setUserID] = useState('');
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -16,86 +16,94 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [isCreatingEntry, setIsCreatingEntry] = useState(false);
   const [entryCreated, setEntryCreated] = useState(false);
+  const [authAttempted, setAuthAttempted] = useState(false);
 
   useEffect(() => {
+    // Simple authentication with a timeout to prevent infinite loading
+    const authTimeout = setTimeout(() => {
+      // If auth takes too long, just show the dashboard anyway
+      if (isLoading) {
+        console.log('Auth timeout - showing dashboard anyway');
+        setIsLoading(false);
+      }
+    }, 5000); // 5 second timeout maximum
+    
     // Check if this is client-side
     if (typeof window !== 'undefined') {
-      // Load Passage and check auth
-      const loadPassage = async () => {
+      const checkAuth = async () => {
         try {
-          // Check if the Passage global object is available
+          // If we've already attempted authentication, don't try again
+          if (authAttempted) return;
+          setAuthAttempted(true);
+          
+          // Simple Passage check
           if (!window.Passage) {
-            console.error('Passage is not loaded yet, retrying...');
-            return; // Don't redirect, just return and let the timeout try again
-          }
-          
-          // Get the PassageUser class from the global Passage object
-          const PassageUser = window.Passage?.PassageUser;
-          const user = new PassageUser() as PassageUserInterface;
-          setPassageUser(user);
-          
-          const isAuthorized = await user.isAuthenticated();
-          
-          if (!isAuthorized) {
-            console.error('User is not authenticated');
-            router.push('/');
+            console.error('Passage is not loaded - proceeding anyway');
+            setIsLoading(false);
             return;
           }
           
           try {
-            // User is authenticated, get their info
-            const userInfo = await user.userInfo();
-            setUserName(userInfo.email || userInfo.phone || 'Partner');
-            setUserID(userInfo.id || '');
+            const PassageUser = window.Passage.PassageUser;
+            const user = new PassageUser();
+            setPassageUser(user);
+            
+            // Check if auth methods exist
+            if (typeof user.isAuthenticated !== 'function') {
+              console.error('isAuthenticated method not found');
+              setIsLoading(false);
+              return;
+            }
+            
+            const isAuthorized = await user.isAuthenticated();
+            
+            if (!isAuthorized) {
+              console.log('User is not authenticated, redirecting...');
+              router.push('/');
+              return;
+            }
+            
+            // User is authenticated, get basic info
+            if (typeof user.userInfo === 'function') {
+              const userInfo = await user.userInfo();
+              setUserName(userInfo.email || userInfo.phone || 'Partner');
+              setUserID(userInfo.id || '');
+            }
+          } catch (error) {
+            console.error('Auth error, but continuing:', error);
+          } finally {
+            // Always stop loading, even if there are errors
             setIsLoading(false);
-          } catch (userInfoError) {
-            console.error('Error fetching user info:', userInfoError);
-            // Still mark as not loading even if we couldn't get user info
-            setUserName('Partner');
-            setIsLoading(false);
+            clearTimeout(authTimeout);
           }
         } catch (error) {
-          console.error('Auth error:', error);
-          router.push('/');
+          console.error('Unexpected error:', error);
+          setIsLoading(false);
+          clearTimeout(authTimeout);
         }
       };
       
-      // Try several times with increasing delay
-      let attempts = 0;
-      const maxAttempts = 5;
+      // Try to authenticate once
+      checkAuth();
       
-      const attemptLoadPassage = () => {
-        if (attempts < maxAttempts) {
-          attempts++;
-          loadPassage();
-          
-          if (attempts < maxAttempts) {
-            // Schedule next attempt with increasing delay
-            const delay = 500 * attempts;
-            setTimeout(attemptLoadPassage, delay);
-          }
-        } else {
-          console.error('Max attempts reached, redirecting to login');
-          router.push('/');
-        }
-      };
-      
-      // Start attempting to load Passage
-      attemptLoadPassage();
-      
-      // No need to return cleanup function, this will be handled by router
+      return () => clearTimeout(authTimeout);
     }
-  }, [router]);
+  }, [router, isLoading, authAttempted]);
 
   const handleSignOut = async () => {
     try {
-      if (passageUser) {
+      if (passageUser && typeof passageUser.signOut === 'function') {
         await passageUser.signOut();
+        router.push('/');
+      } else {
+        // Fallback for when passageUser is not available
         router.push('/');
       }
     } catch (error) {
       console.error('Sign out error:', error);
       setError('Failed to sign out. Please try again.');
+      // Fallback redirect if signOut fails
+      router.push('/');
     }
   };
 
@@ -175,7 +183,7 @@ export default function Dashboard() {
         <div className="card mb-6">
           <div className="p-4 bg-primary-50 rounded-lg mb-4">
             <p className="text-primary-800 text-sm">
-              <strong>User ID:</strong> {userID}
+              <strong>User ID:</strong> {userID || 'Not authenticated'}
             </p>
           </div>
           
@@ -186,7 +194,7 @@ export default function Dashboard() {
           ) : (
             <button
               onClick={createTestEntry}
-              disabled={isCreatingEntry}
+              disabled={isCreatingEntry || !userID}
               className="btn-primary"
             >
               {isCreatingEntry ? 'Creating...' : 'Create Test Entry'}
