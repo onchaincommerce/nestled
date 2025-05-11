@@ -1,82 +1,108 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/utils/passage';
-import { getSupabaseWithUser, supabase } from '@/utils/supabase';
+import { createClient } from '@supabase/supabase-js';
+import jwt from 'jsonwebtoken';
+
+// Get authenticated Supabase client with Passage user ID
+const getSupabaseWithUser = (userId: string) => {
+  // Create and sign JWT for Supabase
+  const payload = {
+    userId,
+    exp: Math.floor(Date.now() / 1000) + 60 * 60, // 1 hour expiration
+  };
+  
+  const token = jwt.sign(
+    payload, 
+    process.env.SUPABASE_JWT_SECRET || ''
+  );
+  
+  // Create Supabase client with JWT in authorization header
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+    {
+      global: {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    }
+  );
+  
+  return supabase;
+};
 
 export async function POST(req: NextRequest) {
   try {
-    // Authenticate the request using Passage
-    const passageData = await getAuthenticatedUser(req);
+    console.log('Auth endpoint called with: ', req.url);
     
-    if (!passageData.isAuthorized) {
+    // Authenticate the user with Passage
+    const passageAuth = await getAuthenticatedUser(req);
+    
+    if (!passageAuth.isAuthorized || !passageAuth.userID) {
+      console.error('User not authorized');
       return NextResponse.json(
-        { error: 'Unauthorized' },
+        { error: 'Not authorized' },
         { status: 401 }
       );
     }
     
-    // Get the user ID from Passage
-    const { userID, email } = passageData;
+    const userID = passageAuth.userID;
+    console.log('User authorized with Passage ID:', userID);
     
-    if (!userID) {
-      return NextResponse.json(
-        { error: 'User ID not found' },
-        { status: 400 }
-      );
-    }
+    // Get Supabase client with the user's ID
+    const supabase = getSupabaseWithUser(userID);
     
-    // Check if user exists in Supabase
-    const { data: existingUser } = await supabase
+    // Check if user already exists in database
+    const { data: existingUser, error: userCheckError } = await supabase
       .from('users')
-      .select('*')
+      .select('id, email, username')
       .eq('id', userID)
       .single();
+    
+    console.log('User check result:', { existingUser, userCheckError });
     
     // If user doesn't exist, create them
     if (!existingUser) {
-      await supabase.from('users').insert({
-        id: userID,
-        email: email,
-        username: email ? email.split('@')[0] : `user_${userID.substring(0, 8)}`
+      // Generate a username from userID since we don't have email access here
+      const username = `user_${userID.substring(0, 8)}`;
+      
+      console.log('Creating new user with ID:', userID, 'and username:', username);
+      
+      const { data: newUser, error: createUserError } = await supabase
+        .from('users')
+        .insert({
+          id: userID,
+          username: username
+        })
+        .select();
+      
+      if (createUserError) {
+        console.error('Error creating user:', createUserError);
+        return NextResponse.json(
+          { error: 'Failed to create user', details: createUserError },
+          { status: 500 }
+        );
+      }
+      
+      console.log('User created successfully:', newUser);
+      
+      return NextResponse.json({
+        message: 'User created successfully',
+        user: newUser[0]
       });
     }
     
-    // Get a Supabase client with the user's JWT
-    const authenticatedSupabase = getSupabaseWithUser(userID);
-    
-    // Get user data now that they are authenticated
-    const { data: userData, error: userError } = await authenticatedSupabase
-      .from('users')
-      .select(`
-        id, 
-        email, 
-        couples_users (
-          couple_id,
-          couples (
-            id,
-            name
-          )
-        )
-      `)
-      .eq('id', userID)
-      .single();
-    
-    if (userError) {
-      console.error('Error fetching user data:', userError);
-      return NextResponse.json(
-        { error: 'Error fetching user data' },
-        { status: 500 }
-      );
-    }
+    console.log('User already exists:', existingUser);
     
     return NextResponse.json({
-      authenticated: true,
-      user: userData,
+      message: 'User already exists',
+      user: existingUser
     });
-    
   } catch (error) {
-    console.error('Authentication error:', error);
+    console.error('Error in auth endpoint:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: (error as Error).message || 'Unknown error' },
       { status: 500 }
     );
   }

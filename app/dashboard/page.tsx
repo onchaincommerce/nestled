@@ -70,6 +70,9 @@ export default function Dashboard() {
               setUserName(userInfo.email || userInfo.phone || 'Partner');
               setUserID(userInfo.id || '');
               
+              // Get the auth token
+              const authToken = await user.getAuthToken();
+              
               // Register user in Supabase database
               try {
                 console.log('Attempting to register user with ID:', userInfo.id);
@@ -77,6 +80,7 @@ export default function Dashboard() {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
                   },
                 });
                 
