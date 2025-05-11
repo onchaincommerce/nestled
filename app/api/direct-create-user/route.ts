@@ -44,6 +44,62 @@ export async function POST(request: Request) {
       });
     }
     
+    // Try an alternate approach: use direct SQL if we have service_role access
+    try {
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (serviceRoleKey) {
+        console.log('Attempting to use service_role key to bypass RLS');
+        
+        // Create a service_role client that bypasses RLS
+        const adminSupabase = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+          serviceRoleKey
+        );
+        
+        // Generate an appropriate UUID
+        let idToUse = userId;
+        try {
+          if (userId.length !== 36 || !userId.includes('-')) {
+            idToUse = crypto.randomUUID();
+          }
+        } catch (e) {
+          idToUse = crypto.randomUUID();
+        }
+        
+        const timestamp = new Date().toISOString();
+        
+        // Execute a direct SQL insert that bypasses RLS
+        const { data: sqlData, error: sqlError } = await adminSupabase
+          .rpc('insert_user_bypass_rls', { 
+            user_id: idToUse,
+            user_username: `user_${idToUse.substring(0, 8)}`,
+            created_at_time: timestamp,
+            updated_at_time: timestamp
+          });
+          
+        if (!sqlError) {
+          console.log('User created with SQL RPC function:', sqlData);
+          
+          // Fetch the newly created user
+          const { data: newUser } = await adminSupabase
+            .from('users')
+            .select('id, email, username')
+            .eq('id', idToUse)
+            .single();
+            
+          return NextResponse.json({
+            message: 'User created successfully via SQL RPC',
+            user: newUser
+          });
+        } else {
+          console.error('Error with SQL RPC function:', sqlError);
+        }
+      }
+    } catch (adminError) {
+      console.error('Error with service_role approach:', adminError);
+    }
+    
+    // If service_role approach failed, continue with original method
     // Generate a valid UUID if the provided ID isn't already a UUID
     // Note that Passage IDs may not be valid UUIDs, which could cause insertion errors
     let idToUse = userId;
