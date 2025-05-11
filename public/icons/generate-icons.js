@@ -1,8 +1,9 @@
+// This script generates proper icon files
 const fs = require('fs');
 const path = require('path');
 
-// Basic SVG template for our icon
-const createSvgIcon = (size) => `
+// Base SVG template for icons
+const createIconSVG = (size) => `
 <svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
   <rect width="${size}" height="${size}" fill="#EF6F6C" rx="20%" ry="20%" />
   <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-weight="bold" font-size="${size * 0.4}" fill="white">N</text>
@@ -10,18 +11,21 @@ const createSvgIcon = (size) => `
 </svg>
 `;
 
-// Convert SVG to PNG using a simple canvas approach
-// For real icons, you should use a proper tool like sharp or Inkscape
-// For this demo, we're just saving the SVG files with .png extension
-// In a real app, you'd want to convert them properly
-
+// Icon sizes to generate
 const sizes = [192, 384, 512];
 
+// Generate SVG files
 sizes.forEach(size => {
-  const svgContent = createSvgIcon(size);
-  fs.writeFileSync(path.join(__dirname, `icon-${size}x${size}.svg`), svgContent);
-  // In a real implementation, you'd convert SVG to PNG here
-  fs.writeFileSync(path.join(__dirname, `icon-${size}x${size}.png`), svgContent);
+  // Write SVG file
+  const svgFilePath = path.join(__dirname, `icon-${size}x${size}.svg`);
+  fs.writeFileSync(svgFilePath, createIconSVG(size));
+  console.log(`Generated SVG icon: ${svgFilePath}`);
+  
+  // For PWA compatibility, also save the SVG content to the PNG filename
+  // This is a temporary solution; in a real app, you'd use a proper image conversion tool
+  const pngFilePath = path.join(__dirname, `icon-${size}x${size}.png`);
+  fs.writeFileSync(pngFilePath, createIconSVG(size));
+  console.log(`Generated PNG icon: ${pngFilePath}`);
 });
 
-console.log('Icons created in public/icons/'); 
+console.log('Icon generation complete. To create real PNG files, please use a proper image conversion tool or service.'); 
