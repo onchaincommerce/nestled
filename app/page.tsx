@@ -14,9 +14,16 @@ export default function Home() {
     
     // Check if user is already logged in
     const checkAuth = async () => {
-      if (typeof window !== 'undefined' && window.Passage) {
-        try {
-          const PassageUser = window.Passage?.PassageUser;
+      try {
+        // Make sure Passage is loaded before checking auth
+        if (typeof window !== 'undefined') {
+          // Wait for Passage to be available
+          if (!window.Passage) {
+            console.log('Passage not loaded yet, waiting...');
+            return; // Will retry on next interval
+          }
+          
+          const PassageUser = window.Passage.PassageUser;
           const user = new PassageUser();
           const isAuthorized = await user.isAuthenticated();
           
@@ -24,19 +31,18 @@ export default function Home() {
             // User is already authenticated, redirect to dashboard
             router.push('/dashboard');
           }
-        } catch (error) {
-          console.error('Auth check error:', error);
-          // Fall back to showing the login page
         }
+      } catch (error) {
+        console.error('Auth check error:', error);
+        // Just log the error and continue showing the login page
       }
     };
     
-    // Add a delay to ensure Passage has loaded
-    const timer = setTimeout(() => {
-      checkAuth();
-    }, 1000);
+    // Try to check auth every second until Passage is loaded
+    const intervalId = setInterval(checkAuth, 1000);
     
-    return () => clearTimeout(timer);
+    // Clean up the interval on unmount
+    return () => clearInterval(intervalId);
   }, [router]);
 
   return (

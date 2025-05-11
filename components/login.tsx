@@ -29,7 +29,6 @@ const PassageLogin = () => {
         // @ts-ignore - passage-auth is a custom element from Passage
         <passage-auth 
           app-id={passageAppId}
-          auth-methods="passkey, magic_link"
         // @ts-ignore - passage-auth is a custom element
         ></passage-auth>
       )}
