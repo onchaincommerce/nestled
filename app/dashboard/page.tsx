@@ -25,9 +25,8 @@ export default function Dashboard() {
         try {
           // Check if the Passage global object is available
           if (!window.Passage) {
-            console.error('Passage is not loaded yet');
-            router.push('/');
-            return;
+            console.error('Passage is not loaded yet, retrying...');
+            return; // Don't redirect, just return and let the timeout try again
           }
           
           // Get the PassageUser class from the global Passage object
@@ -38,27 +37,53 @@ export default function Dashboard() {
           const isAuthorized = await user.isAuthenticated();
           
           if (!isAuthorized) {
+            console.error('User is not authenticated');
             router.push('/');
             return;
           }
           
-          // User is authenticated, get their info
-          const userInfo = await user.userInfo();
-          setUserName(userInfo.email || userInfo.phone || 'Partner');
-          setUserID(userInfo.id || '');
-          setIsLoading(false);
+          try {
+            // User is authenticated, get their info
+            const userInfo = await user.userInfo();
+            setUserName(userInfo.email || userInfo.phone || 'Partner');
+            setUserID(userInfo.id || '');
+            setIsLoading(false);
+          } catch (userInfoError) {
+            console.error('Error fetching user info:', userInfoError);
+            // Still mark as not loading even if we couldn't get user info
+            setUserName('Partner');
+            setIsLoading(false);
+          }
         } catch (error) {
           console.error('Auth error:', error);
           router.push('/');
         }
       };
       
-      // Add a small delay to ensure Passage has time to initialize
-      const timer = setTimeout(() => {
-        loadPassage();
-      }, 500);
+      // Try several times with increasing delay
+      let attempts = 0;
+      const maxAttempts = 5;
       
-      return () => clearTimeout(timer);
+      const attemptLoadPassage = () => {
+        if (attempts < maxAttempts) {
+          attempts++;
+          loadPassage();
+          
+          if (attempts < maxAttempts) {
+            // Schedule next attempt with increasing delay
+            const delay = 500 * attempts;
+            setTimeout(attemptLoadPassage, delay);
+          }
+        } else {
+          console.error('Max attempts reached, redirecting to login');
+          router.push('/');
+        }
+      };
+      
+      // Start attempting to load Passage
+      attemptLoadPassage();
+      
+      // No need to return cleanup function, this will be handled by router
     }
   }, [router]);
 

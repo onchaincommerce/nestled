@@ -32,12 +32,26 @@ export default function Home() {
       }
     };
     
-    // Add a delay to ensure Passage has loaded
-    const timer = setTimeout(() => {
-      checkAuth();
-    }, 1000);
+    // Try several times with increasing delay
+    let attempts = 0;
+    const maxAttempts = 5;
     
-    return () => clearTimeout(timer);
+    const attemptCheckAuth = () => {
+      if (attempts < maxAttempts) {
+        attempts++;
+        checkAuth();
+        
+        if (attempts < maxAttempts) {
+          // Schedule next attempt with increasing delay
+          const delay = 500 * attempts;
+          setTimeout(attemptCheckAuth, delay);
+        }
+      }
+    };
+    
+    // Start attempting to check authentication
+    attemptCheckAuth();
+    
   }, [router]);
 
   return (

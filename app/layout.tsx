@@ -31,6 +31,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="Nestled" />
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+        <script src="https://cdn.passage.id/passage-web.js"></script>
       </head>
       <body className="min-h-screen bg-gray-50 text-gray-900">
         <PwaProvider>
