@@ -13,6 +13,9 @@ export default function Dashboard() {
   const [userID, setUserID] = useState('');
   const [activeTab, setActiveTab] = useState('dashboard');
   const [passageUser, setPassageUser] = useState<PassageUserInterface | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isCreatingEntry, setIsCreatingEntry] = useState(false);
+  const [entryCreated, setEntryCreated] = useState(false);
 
   useEffect(() => {
     // Check if this is client-side
@@ -67,6 +70,39 @@ export default function Dashboard() {
       }
     } catch (error) {
       console.error('Sign out error:', error);
+      setError('Failed to sign out. Please try again.');
+    }
+  };
+
+  const createTestEntry = async () => {
+    if (!userID || isCreatingEntry) return;
+    
+    setIsCreatingEntry(true);
+    
+    try {
+      // Create a simple entry in the database to verify everything works
+      const response = await fetch('/api/test-entry', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: userID,
+          content: 'Test entry from PWA',
+          timestamp: new Date().toISOString()
+        }),
+      });
+      
+      if (response.ok) {
+        setEntryCreated(true);
+      } else {
+        setError('Failed to create test entry. Database connection issue.');
+      }
+    } catch (error) {
+      console.error('Error creating test entry:', error);
+      setError('Network error while creating test entry.');
+    } finally {
+      setIsCreatingEntry(false);
     }
   };
 
@@ -102,6 +138,35 @@ export default function Dashboard() {
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-800">Welcome, {userName}!</h1>
           <p className="text-gray-600 text-sm mt-1">Here&apos;s what&apos;s happening in your relationship.</p>
+        </div>
+
+        {/* User ID & Test Entry */}
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg">
+            {error}
+          </div>
+        )}
+        
+        <div className="card mb-6">
+          <div className="p-4 bg-primary-50 rounded-lg mb-4">
+            <p className="text-primary-800 text-sm">
+              <strong>User ID:</strong> {userID}
+            </p>
+          </div>
+          
+          {entryCreated ? (
+            <div className="p-3 bg-green-50 text-green-700 rounded-lg">
+              Test entry successfully created in the database!
+            </div>
+          ) : (
+            <button
+              onClick={createTestEntry}
+              disabled={isCreatingEntry}
+              className="btn-primary"
+            >
+              {isCreatingEntry ? 'Creating...' : 'Create Test Entry'}
+            </button>
+          )}
         </div>
 
         {/* Dashboard Cards */}

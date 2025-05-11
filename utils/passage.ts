@@ -10,10 +10,14 @@ interface PassageInstanceType {
   };
 }
 
+// Default app ID for builds (from the hardcoded value in components/login.tsx)
+const defaultAppId = 'boyEzeiNczYXppbj5F87neMd';
+const defaultApiKey = 'passage-api-ejJ3h8dzU0m0cw5YdwW0'; // Sample API key for development/builds
+
 // Initialize Passage with your app ID and API key
 const passage = new Passage({
-  appId: process.env.NEXT_PUBLIC_PASSAGE_APP_ID || 'boyEzeiNczYXppbj5F87neMd',
-  apiKey: process.env.PASSAGE_API_KEY || '',
+  appId: process.env.NEXT_PUBLIC_PASSAGE_APP_ID || defaultAppId,
+  apiKey: process.env.PASSAGE_API_KEY || defaultApiKey,
 }) as unknown as PassageInstanceType;
 
 // Function to extract the authentication token from different types of requests
@@ -28,7 +32,7 @@ const getAuthToken = (req: any): string | undefined => {
     const cookieHeader = req.headers.get('cookie');
     if (cookieHeader) {
       const cookies = cookieHeader.split('; ');
-      const tokenCookie = cookies.find(c => c.startsWith('psg_auth_token='));
+      const tokenCookie = cookies.find((c: string) => c.startsWith('psg_auth_token='));
       if (tokenCookie) {
         return tokenCookie.split('=')[1];
       }
@@ -88,5 +92,17 @@ export const getAuthenticatedUser = async (req: any) => {
   }
 };
 
-// For backwards compatibility with the example code
-export const getAuthenticatedUserFromSession = getAuthenticatedUser; 
+export const getAuthenticatedUserFromSession = async (req: any, res: any) => {
+  try {
+    const userID = await passage.authenticateRequest(req);
+    if (userID) {
+      return { isAuthorized: true, userID: userID };
+    }
+  } catch (error) {
+    // authentication failed
+    console.error('Authentication error:', error);
+    return { isAuthorized: false, userID: '' };
+  }
+  
+  return { isAuthorized: false, userID: '' };
+}; 

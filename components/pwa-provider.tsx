@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { registerServiceWorker, setupPwaInstallPrompt } from '../pwa-register';
+import { registerServiceWorker, setupPwaInstallPrompt } from '../app/pwa-register';
 
 export default function PwaProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {

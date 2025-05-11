@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import PwaProvider from "./components/pwa-provider";
+import PwaProvider from "@/components/pwa-provider";
 
 export const metadata: Metadata = {
   title: "Nestled - Shared Journal & Memory App for Couples",

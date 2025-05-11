@@ -21,8 +21,8 @@ export default function Home() {
           const isAuthorized = await user.isAuthenticated();
           
           if (isAuthorized) {
-            // User is already authenticated, redirect to welcome page
-            router.push('/welcome');
+            // User is already authenticated, redirect to dashboard
+            router.push('/dashboard');
           }
         } catch (error) {
           console.error('Auth check error:', error);
