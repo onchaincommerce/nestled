@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import PassageLogin from '@/components/login';
 
-export default function Home() {
+// Create a client component that uses useSearchParams
+function HomeContent() {
   const [isClient, setIsClient] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -168,5 +169,21 @@ export default function Home() {
         </div>
       </footer>
     </main>
+  );
+}
+
+// Main component with Suspense boundary
+export default function Home() {
+  // Loading fallback to display while the page is loading
+  const loadingFallback = (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="animate-pulse text-2xl text-primary-600 font-bold">Loading...</div>
+    </div>
+  );
+  
+  return (
+    <Suspense fallback={loadingFallback}>
+      <HomeContent />
+    </Suspense>
   );
 }
