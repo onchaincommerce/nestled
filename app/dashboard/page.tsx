@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { PassageUserInterface } from '@/utils/passage-types';
 import { handleSafeSignOut } from '@/app/pwa-register';
+import InvitePartnerModal from '@/app/components/InvitePartnerModal';
 
 // This is a client component so we'll handle authentication on the client side
 export default function Dashboard() {
@@ -18,8 +19,15 @@ export default function Dashboard() {
   const [isCreatingEntry, setIsCreatingEntry] = useState(false);
   const [entryCreated, setEntryCreated] = useState(false);
   const [authAttempted, setAuthAttempted] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [baseUrl, setBaseUrl] = useState('');
 
   useEffect(() => {
+    // Set the base URL for sharing invite links
+    if (typeof window !== 'undefined') {
+      setBaseUrl(window.location.origin);
+    }
+    
     // Simple authentication with a timeout to prevent infinite loading
     const authTimeout = setTimeout(() => {
       // If auth takes too long, just show the dashboard anyway
@@ -306,13 +314,16 @@ export default function Dashboard() {
               <h3 className="text-lg font-semibold text-primary-800 mb-1">Share the Love</h3>
               <p className="text-gray-600 text-sm">Invite your partner to join Nestled and connect with you.</p>
             </div>
-            <Link href="/invite-partner" className="bg-gradient-to-r from-secondary-600 to-secondary-700 text-white px-5 py-2.5 rounded-2xl hover:from-secondary-700 hover:to-secondary-800 transition-all duration-300 font-medium shadow-sm hover:shadow flex items-center whitespace-nowrap">
+            <button 
+              onClick={() => setShowInviteModal(true)} 
+              className="bg-gradient-to-r from-secondary-600 to-secondary-700 text-white px-5 py-2.5 rounded-2xl hover:from-secondary-700 hover:to-secondary-800 transition-all duration-300 font-medium shadow-sm hover:shadow flex items-center whitespace-nowrap"
+            >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1.5" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
                 <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
               </svg>
               Invite Partner
-            </Link>
+            </button>
           </div>
         </div>
         
@@ -427,6 +438,14 @@ export default function Dashboard() {
           <span className="text-xs mt-1">Memories</span>
         </Link>
       </nav>
+      
+      {/* Partner Invitation Modal */}
+      <InvitePartnerModal 
+        isOpen={showInviteModal}
+        onClose={() => setShowInviteModal(false)}
+        userID={userID}
+        baseUrl={baseUrl}
+      />
     </div>
   );
 } 

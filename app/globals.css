@@ -74,4 +74,25 @@ body {
     content: "";
     @apply absolute -z-10 bottom-0 left-0 w-64 h-64 bg-secondary-100 rounded-full opacity-50 blur-3xl;
   }
+  
+  /* Modal styles */
+  .modal-overlay {
+    @apply fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4;
+    animation: fadeIn 0.2s ease-out forwards;
+  }
+  
+  .modal-content {
+    @apply bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto;
+    animation: scaleIn 0.2s ease-out forwards;
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  
+  @keyframes scaleIn {
+    from { transform: scale(0.95); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
 }
