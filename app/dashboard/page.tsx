@@ -299,6 +299,23 @@ export default function Dashboard() {
           </div>
         )}
         
+        {/* Invite Partner Banner */}
+        <div className="bg-gradient-to-br from-white/90 to-secondary-50/80 backdrop-blur-sm rounded-2xl shadow-sm border border-secondary-100/30 p-5 mb-5 hover:shadow-md transition-all duration-300">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-semibold text-primary-800 mb-1">Share the Love</h3>
+              <p className="text-gray-600 text-sm">Invite your partner to join Nestled and connect with you.</p>
+            </div>
+            <Link href="/invite-partner" className="bg-gradient-to-r from-secondary-600 to-secondary-700 text-white px-5 py-2.5 rounded-2xl hover:from-secondary-700 hover:to-secondary-800 transition-all duration-300 font-medium shadow-sm hover:shadow flex items-center whitespace-nowrap">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1.5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
+                <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
+              </svg>
+              Invite Partner
+            </Link>
+          </div>
+        </div>
+        
         <div className="bg-gradient-to-br from-white/90 to-primary-50/80 backdrop-blur-sm rounded-2xl shadow-sm border border-primary-100/30 p-5 mb-5 hover:shadow-md transition-all duration-300">
           <div className="p-3 bg-primary-50/80 rounded-xl mb-3 border border-primary-200/30">
             <p className="text-primary-800 text-sm">
