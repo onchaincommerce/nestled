@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { PassageUserInterface } from '@/utils/passage-types';
 import { handleSafeSignOut } from '@/app/pwa-register';
 import InvitePartnerModal from '@/app/components/InvitePartnerModal';
+import ConnectPartnerCard from '@/app/components/ConnectPartnerCard';
 
 // This is a client component so we'll handle authentication on the client side
 export default function Dashboard() {
@@ -23,6 +24,60 @@ export default function Dashboard() {
   const [baseUrl, setBaseUrl] = useState('');
   const [processingInviteCode, setProcessingInviteCode] = useState(false);
   const [inviteRedeemResult, setInviteRedeemResult] = useState<{success: boolean, message: string} | null>(null);
+  const [isInCouple, setIsInCouple] = useState<boolean | null>(null);
+
+  // Function to check if user is in a couple
+  const checkCoupleStatus = async (userId: string) => {
+    try {
+      const response = await fetch('/api/couples/status', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setIsInCouple(data.isInCouple);
+        return data.isInCouple;
+      } else {
+        console.error('Failed to check couple status');
+        return false;
+      }
+    } catch (error) {
+      console.error('Error checking couple status:', error);
+      return false;
+    }
+  };
+
+  // Handle successful invite code redemption
+  const handleInviteSuccess = (message: string) => {
+    setInviteRedeemResult({
+      success: true,
+      message: message
+    });
+    
+    // Update couple status
+    setIsInCouple(true);
+    
+    // Hide the success message after 5 seconds
+    setTimeout(() => {
+      setInviteRedeemResult(null);
+    }, 5000);
+  };
+
+  // Handle invite code error
+  const handleInviteError = (message: string) => {
+    setInviteRedeemResult({
+      success: false,
+      message: message
+    });
+    
+    // Hide the error message after 5 seconds
+    setTimeout(() => {
+      setInviteRedeemResult(null);
+    }, 5000);
+  };
 
   useEffect(() => {
     // Set the base URL for sharing invite links
@@ -68,6 +123,7 @@ export default function Dashboard() {
               success: true,
               message: 'Successfully connected with your partner!'
             });
+            setIsInCouple(true); // Update couple status
           } else {
             console.error('Failed to redeem invitation:', data);
             setInviteRedeemResult({
@@ -188,6 +244,9 @@ export default function Dashboard() {
                 
                 // Check for pending invite code after authentication is confirmed
                 checkPendingInviteCode(userInfo.id || userId || '');
+                
+                // Check if user is in a couple
+                checkCoupleStatus(userInfo.id || userId || '');
                 
                 // Register user in Supabase database using direct API call
                 // This is more reliable than relying on the auth token
@@ -412,25 +471,36 @@ export default function Dashboard() {
           </div>
         )}
         
-        {/* Invite Partner Banner */}
-        <div className="bg-gradient-to-br from-white/90 to-secondary-50/80 backdrop-blur-sm rounded-2xl shadow-sm border border-secondary-100/30 p-5 mb-5 hover:shadow-md transition-all duration-300">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div>
-              <h3 className="text-lg font-semibold text-primary-800 mb-1">Share the Love</h3>
-              <p className="text-gray-600 text-sm">Invite your partner to join Nestled and connect with you.</p>
+        {/* Connect Partner Card - only show if user is not in a couple */}
+        {isInCouple === false && (
+          <ConnectPartnerCard 
+            userID={userID} 
+            onSuccess={handleInviteSuccess}
+            onError={handleInviteError}
+          />
+        )}
+        
+        {/* Invite Partner Banner - only show if user is in a couple */}
+        {isInCouple && (
+          <div className="bg-gradient-to-br from-white/90 to-secondary-50/80 backdrop-blur-sm rounded-2xl shadow-sm border border-secondary-100/30 p-5 mb-5 hover:shadow-md transition-all duration-300">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold text-primary-800 mb-1">Share the Love</h3>
+                <p className="text-gray-600 text-sm">Invite your partner to join Nestled and connect with you.</p>
+              </div>
+              <button 
+                onClick={() => setShowInviteModal(true)} 
+                className="bg-gradient-to-r from-secondary-600 to-secondary-700 text-white px-5 py-2.5 rounded-2xl hover:from-secondary-700 hover:to-secondary-800 transition-all duration-300 font-medium shadow-sm hover:shadow flex items-center whitespace-nowrap"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1.5" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
+                  <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
+                </svg>
+                Invite Partner
+              </button>
             </div>
-            <button 
-              onClick={() => setShowInviteModal(true)} 
-              className="bg-gradient-to-r from-secondary-600 to-secondary-700 text-white px-5 py-2.5 rounded-2xl hover:from-secondary-700 hover:to-secondary-800 transition-all duration-300 font-medium shadow-sm hover:shadow flex items-center whitespace-nowrap"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1.5" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
-                <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
-              </svg>
-              Invite Partner
-            </button>
           </div>
-        </div>
+        )}
         
         <div className="bg-gradient-to-br from-white/90 to-primary-50/80 backdrop-blur-sm rounded-2xl shadow-sm border border-primary-100/30 p-5 mb-5 hover:shadow-md transition-all duration-300">
           <div className="p-3 bg-primary-50/80 rounded-xl mb-3 border border-primary-200/30">

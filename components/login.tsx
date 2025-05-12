@@ -10,6 +10,7 @@ type PassageLoginProps = {
 const PassageLogin = ({ inviteCodeFromUrl }: PassageLoginProps) => {
   const router = useRouter();
   const searchParams = useSearchParams();
+  // We'll still capture the code from URL but won't show the input field
   const [inviteCode, setInviteCode] = useState(inviteCodeFromUrl || searchParams?.get('code') || '');
 
   useEffect(() => {
@@ -54,26 +55,6 @@ const PassageLogin = ({ inviteCodeFromUrl }: PassageLoginProps) => {
       <div className="relative p-8 backdrop-blur-sm bg-white/60">
         {/* @ts-ignore - passage-auth is a custom element from Passage */}
         <passage-auth app-id={passageAppId}></passage-auth>
-        
-        {/* Invite code field - optional */}
-        <div className="mt-6 p-4 bg-white/50 rounded-xl border border-secondary-100/30">
-          <label htmlFor="invite-code" className="block text-sm font-medium text-primary-700 mb-1">
-            Joining your partner? (Optional)
-          </label>
-          <input
-            type="text"
-            id="invite-code"
-            placeholder="Enter invite code (if you have one)"
-            value={inviteCode}
-            onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-center uppercase"
-          />
-          <p className="text-xs text-gray-500 mt-1 text-center">
-            Only needed if your partner has already created an account and invited you.
-            <br />
-            <span className="font-medium">First time users can skip this step.</span>
-          </p>
-        </div>
         
         <div className="mt-6 text-center">
           <p className="text-sm text-primary-700 font-medium">Start your relationship journal today!</p>
