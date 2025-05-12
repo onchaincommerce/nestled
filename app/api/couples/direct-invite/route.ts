@@ -248,47 +248,15 @@ export async function GET(request: NextRequest) {
       .single();
     
     if (coupleUserError || !coupleUserData) {
-      // The user isn't in a couple yet - create one so they can generate invites
-      console.log('User not in a couple for GET invites. Creating a new couple.');
-      const { data: newCouple, error: newCoupleError } = await supabase
-        .from('couples')
-        .insert({
-          name: 'New Couple',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .select()
-        .single();
+      // IMPORTANT: Don't automatically create a couple
+      // Just return a response indicating the user isn't in a couple
+      console.log('User not in a couple for GET invites. Not creating a couple automatically.');
       
-      if (newCoupleError || !newCouple) {
-        console.error('Failed to create couple for GET invites:', newCoupleError);
-        return NextResponse.json(
-          { error: 'Failed to create couple', details: newCoupleError }, 
-          { status: 500 }
-        );
-      }
-      
-      // Link the user to the couple
-      const { error: linkError } = await supabase
-        .from('couples_users')
-        .insert({
-          couple_id: newCouple.id,
-          user_id: userData.id
-        });
-      
-      if (linkError) {
-        console.error('Failed to link user to couple for GET invites:', linkError);
-        return NextResponse.json(
-          { error: 'Failed to link user to couple', details: linkError }, 
-          { status: 500 }
-        );
-      }
-      
-      // Return empty invitations list since this is a new couple
+      // Return empty invitations list 
       return NextResponse.json({
         invitations: [],
-        new_couple_created: true,
-        couple_id: newCouple.id
+        in_couple: false,
+        message: "User is not in a couple yet"
       });
     }
     
@@ -316,7 +284,9 @@ export async function GET(request: NextRequest) {
     }));
     
     return NextResponse.json({
-      invitations: invitationsWithUrls
+      invitations: invitationsWithUrls,
+      in_couple: true,
+      couple_id: coupleUserData.couple_id
     });
   } catch (error) {
     console.error('Error in direct-invite GET endpoint:', error);

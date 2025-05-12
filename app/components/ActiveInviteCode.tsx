@@ -58,14 +58,20 @@ const ActiveInviteCode = ({ userID, baseUrl }: ActiveInviteCodeProps) => {
         
         const data = await response.json();
         
+        // Check if user is in a couple
+        if (!data.in_couple) {
+          // User is not in a couple - we don't show an invite code
+          // A couple will be created when they generate an invite
+          setActiveInviteCode(null);
+          setIsLoading(false);
+          return;
+        }
+        
         if (data.invitations && data.invitations.length > 0) {
           // User has an existing active invite code
           setActiveInviteCode(data.invitations[0]);
-        } else if (data.new_couple_created) {
-          // A new couple was created, but we won't auto-generate an invite code
-          // User must explicitly click the button to generate one
-          setActiveInviteCode(null);
         } else {
+          // User is in a couple but has no active invites
           setActiveInviteCode(null);
         }
       } catch (e) {
