@@ -47,7 +47,7 @@ function validateApiKey(request: NextRequest): boolean {
   return true;
 }
 
-// Create a new couple and add the user to it
+// Create a user record or find existing user, without automatically creating a couple
 export async function POST(request: NextRequest) {
   try {
     // Validate API key
@@ -82,7 +82,9 @@ export async function POST(request: NextRequest) {
         .single();
       
       if (!existingUserError && existingUser) {
+        // User already exists, just return their ID
         dbUserId = existingUser.id;
+        console.log('User already exists, returning user ID:', dbUserId);
       } else {
         // Create user if they don't exist
         const { data: newUser, error: newUserError } = await supabase
@@ -104,6 +106,7 @@ export async function POST(request: NextRequest) {
         }
         
         dbUserId = newUser.id;
+        console.log('Created new user with ID:', dbUserId);
       }
     }
     
@@ -122,7 +125,7 @@ export async function POST(request: NextRequest) {
       .single();
       
     if (!coupleError && existingCouple) {
-      // User already in a couple
+      // User already in a couple - just return that information
       return NextResponse.json({
         success: true,
         couple_id: existingCouple.couple_id,
@@ -131,51 +134,14 @@ export async function POST(request: NextRequest) {
       });
     }
     
-    // Create a new couple
-    const { data: newCouple, error: newCoupleError } = await supabase
-      .from('couples')
-      .insert({
-        name: 'New Couple'
-      })
-      .select()
-      .single();
-      
-    if (newCoupleError) {
-      return NextResponse.json(
-        { error: 'Failed to create couple', details: newCoupleError },
-        { status: 500 }
-      );
-    }
-    
-    // Now add user to the couple directly using SQL to bypass RLS completely
-    const { data: coupleUser, error: coupleUserError } = await supabase
-      .rpc('create_couple_user_relation', {
-        p_couple_id: newCouple.id,
-        p_user_id: dbUserId
-      });
-      
-    if (coupleUserError) {
-      console.error('Error creating couple_user with RPC:', coupleUserError);
-      
-      // Try direct insert as fallback
-      const { error: directError } = await supabase.from('couples_users').insert({
-        couple_id: newCouple.id,
-        user_id: dbUserId
-      });
-      
-      if (directError) {
-        return NextResponse.json(
-          { error: 'Failed to add user to couple', details: directError },
-          { status: 500 }
-        );
-      }
-    }
+    // IMPORTANT: Unlike before, we do NOT automatically create a couple
+    // This allows new users to redeem invite codes to join existing couples
     
     return NextResponse.json({
       success: true,
-      couple_id: newCouple.id,
       user_id: dbUserId,
-      message: 'Created new couple and added user'
+      message: 'User created or found successfully',
+      original_passage_id: passageId
     });
   } catch (error) {
     console.error('Error in direct-create endpoint:', error);
