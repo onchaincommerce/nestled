@@ -513,7 +513,7 @@ export default function Dashboard() {
           </div>
         )}
         
-        {/* For users in a fully connected couple, show a connection success message */}
+        {/* For users in a fully connected couple, show only a connection success message */}
         {isInCouple === true && isFullyConnected && (
           <div className="bg-gradient-to-br from-white/90 to-green-50/80 backdrop-blur-sm rounded-2xl shadow-sm border border-green-100/30 p-5 mb-5 hover:shadow-md transition-all duration-300">
             <div className="flex items-center mb-3">
