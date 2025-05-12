@@ -26,6 +26,7 @@ export default function Dashboard() {
   const [processingInviteCode, setProcessingInviteCode] = useState(false);
   const [inviteRedeemResult, setInviteRedeemResult] = useState<{success: boolean, message: string} | null>(null);
   const [isInCouple, setIsInCouple] = useState<boolean | null>(null);
+  const [isFullyConnected, setIsFullyConnected] = useState<boolean>(false);
 
   // Function to check if user is in a couple
   const checkCoupleStatus = async (userId: string) => {
@@ -40,15 +41,18 @@ export default function Dashboard() {
       if (response.ok) {
         const data = await response.json();
         setIsInCouple(data.isInCouple); // Use the actual couple status
+        setIsFullyConnected(data.isFullyConnected); // Track if couple has two members
         return data.isInCouple;
       } else {
         console.error('Failed to check couple status');
         setIsInCouple(false); // Default to false to show connect card
+        setIsFullyConnected(false);
         return false;
       }
     } catch (error) {
       console.error('Error checking couple status:', error);
       setIsInCouple(false); // Default to false to show connect card
+      setIsFullyConnected(false);
       return false;
     }
   };
@@ -89,8 +93,16 @@ export default function Dashboard() {
       
       // Listen for couple status changes from ActiveInviteCode component
       const handleCoupleStatusChange = (event: CustomEvent) => {
-        if (event.detail && typeof event.detail.isInCouple === 'boolean') {
-          setIsInCouple(event.detail.isInCouple);
+        if (event.detail) {
+          // Update couple status if provided
+          if (typeof event.detail.isInCouple === 'boolean') {
+            setIsInCouple(event.detail.isInCouple);
+          }
+          
+          // Update fully connected status if provided
+          if (typeof event.detail.isFullyConnected === 'boolean') {
+            setIsFullyConnected(event.detail.isFullyConnected);
+          }
         }
       };
       
@@ -478,8 +490,31 @@ export default function Dashboard() {
           </div>
         )}
         
-        {/* For users in a couple, show a connection success message */}
-        {isInCouple === true && (
+        {/* For users in a couple but waiting for partner to join */}
+        {isInCouple === true && !isFullyConnected && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+            <div className="bg-gradient-to-br from-white/90 to-yellow-50/80 backdrop-blur-sm rounded-2xl shadow-sm border border-yellow-100/30 p-5 transition-all duration-300 hover:shadow-md">
+              <div className="flex items-center mb-3">
+                <div className="bg-yellow-100 p-2 rounded-full mr-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h2 className="text-lg font-semibold text-yellow-800">Waiting for Partner</h2>
+              </div>
+              <p className="text-gray-600 mb-4">
+                Share your invite code with your partner. Once they join, you'll be able to start journaling together!
+              </p>
+            </div>
+            <ActiveInviteCode
+              userID={userID}
+              baseUrl={baseUrl}
+            />
+          </div>
+        )}
+        
+        {/* For users in a fully connected couple, show a connection success message */}
+        {isInCouple === true && isFullyConnected && (
           <div className="bg-gradient-to-br from-white/90 to-green-50/80 backdrop-blur-sm rounded-2xl shadow-sm border border-green-100/30 p-5 mb-5 hover:shadow-md transition-all duration-300">
             <div className="flex items-center mb-3">
               <div className="bg-green-100 p-2 rounded-full mr-3">

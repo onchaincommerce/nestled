@@ -39,6 +39,17 @@ export default function ConnectPartnerCard({ userID, onSuccess, onError }: Conne
         console.log('Successfully redeemed invitation:', data);
         setInviteCode(''); // Clear the input field
         onSuccess('Successfully connected with your partner!');
+        
+        // Trigger an event to notify that the couple is now fully connected
+        if (typeof window !== 'undefined') {
+          const event = new CustomEvent('coupleStatusChanged', { 
+            detail: { 
+              isInCouple: true,
+              isFullyConnected: true
+            } 
+          });
+          window.dispatchEvent(event);
+        }
       } else {
         console.error('Failed to redeem invitation:', data);
         onError(data.error || 'Failed to redeem invitation code');

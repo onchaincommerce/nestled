@@ -161,7 +161,12 @@ const ActiveInviteCode = ({ userID, baseUrl }: ActiveInviteCodeProps) => {
         
         // Trigger a window event to notify the dashboard that the couple status changed
         if (typeof window !== 'undefined') {
-          const event = new CustomEvent('coupleStatusChanged', { detail: { isInCouple: true } });
+          const event = new CustomEvent('coupleStatusChanged', { 
+            detail: { 
+              isInCouple: true,
+              isFullyConnected: false // Explicitly mark as not fully connected
+            } 
+          });
           window.dispatchEvent(event);
         }
       } else {

@@ -60,8 +60,26 @@ export async function GET(request: NextRequest) {
     // User is in a couple if there's at least one record
     const isInCouple = coupleData && coupleData.length > 0;
     
+    // If the user is in a couple, check if the couple has two members
+    let isFullyConnected = false;
+    if (isInCouple) {
+      const coupleId = coupleData[0].couple_id;
+      
+      // Count how many users are in this couple
+      const { data: coupleMembers, error: memberCountError } = await supabase
+        .from('couples_users')
+        .select('user_id')
+        .eq('couple_id', coupleId);
+        
+      if (!memberCountError && coupleMembers) {
+        // A fully connected couple has two or more members
+        isFullyConnected = coupleMembers.length >= 2;
+      }
+    }
+    
     return NextResponse.json({
       isInCouple,
+      isFullyConnected,
       coupleId: isInCouple ? coupleData[0].couple_id : null
     });
     
