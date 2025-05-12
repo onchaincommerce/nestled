@@ -86,8 +86,25 @@ export default function Dashboard() {
     // Set the base URL for sharing invite links
     if (typeof window !== 'undefined') {
       setBaseUrl(window.location.origin);
+      
+      // Listen for couple status changes from ActiveInviteCode component
+      const handleCoupleStatusChange = (event: CustomEvent) => {
+        if (event.detail && typeof event.detail.isInCouple === 'boolean') {
+          setIsInCouple(event.detail.isInCouple);
+        }
+      };
+      
+      // Add event listener
+      window.addEventListener('coupleStatusChanged', handleCoupleStatusChange as EventListener);
+      
+      // Clean up
+      return () => {
+        window.removeEventListener('coupleStatusChanged', handleCoupleStatusChange as EventListener);
+      };
     }
-    
+  }, []);
+
+  useEffect(() => {
     // Simple authentication with a timeout to prevent infinite loading
     const authTimeout = setTimeout(() => {
       // If auth takes too long, just show the dashboard anyway
@@ -461,12 +478,29 @@ export default function Dashboard() {
           </div>
         )}
         
-        {/* For users in a couple, only show the Active Invite Code component */}
+        {/* For users in a couple, show a connection success message */}
         {isInCouple === true && (
-          <ActiveInviteCode
-            userID={userID}
-            baseUrl={baseUrl}
-          />
+          <div className="bg-gradient-to-br from-white/90 to-green-50/80 backdrop-blur-sm rounded-2xl shadow-sm border border-green-100/30 p-5 mb-5 hover:shadow-md transition-all duration-300">
+            <div className="flex items-center mb-3">
+              <div className="bg-green-100 p-2 rounded-full mr-3">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h2 className="text-lg font-semibold text-green-800">Connected with Partner</h2>
+            </div>
+            <p className="text-gray-600 mb-4">
+              You're successfully connected with your partner. You can now start journaling together and sharing memories!
+            </p>
+            <div className="flex justify-end">
+              <Link href="/journal" className="bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 rounded-xl hover:from-green-700 hover:to-green-800 transition-all duration-300 font-medium shadow-sm hover:shadow flex items-center">
+                Start Journaling
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
+            </div>
+          </div>
         )}
         
         <div className="bg-gradient-to-br from-white/90 to-primary-50/80 backdrop-blur-sm rounded-2xl shadow-sm border border-primary-100/30 p-5 mb-5 hover:shadow-md transition-all duration-300">

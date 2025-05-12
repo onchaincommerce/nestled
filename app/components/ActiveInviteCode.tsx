@@ -158,6 +158,12 @@ const ActiveInviteCode = ({ userID, baseUrl }: ActiveInviteCodeProps) => {
           expires_at: data.expires_at,
           created_at: new Date().toISOString(),
         });
+        
+        // Trigger a window event to notify the dashboard that the couple status changed
+        if (typeof window !== 'undefined') {
+          const event = new CustomEvent('coupleStatusChanged', { detail: { isInCouple: true } });
+          window.dispatchEvent(event);
+        }
       } else {
         setError(data.error || 'Failed to generate invite code. Please try again later.');
       }
