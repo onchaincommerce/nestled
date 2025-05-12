@@ -63,10 +63,11 @@ export async function POST(request: NextRequest) {
       .eq('user_id', userId)
       .single();
     
-    // If user is not in a couple, create one with direct SQL that bypasses RLS
+    // If user is not in a couple, create one
     let coupleId: string;
     
     if (coupleError || !coupleData) {
+      console.log('User not in a couple. Creating a new couple.');
       // Create a couple directly - This is the simplest approach
       const { data: newCouple, error: newCoupleError } = await supabase
         .from('couples')
@@ -104,10 +105,44 @@ export async function POST(request: NextRequest) {
       
       coupleId = newCouple.id;
     } else {
+      console.log('User already in a couple. Using existing couple ID.');
       coupleId = coupleData.couple_id;
     }
     
-    // 3. Create the invitation directly
+    // 3. Check for existing active invitations from this user
+    const now = new Date().toISOString();
+    const { data: existingInvites, error: existingInvitesError } = await supabase
+      .from('couple_invitations')
+      .select('id, code')
+      .eq('couple_id', coupleId)
+      .eq('created_by', userId)
+      .gt('expires_at', now)
+      .is('redeemed_at', null);
+    
+    // If there are existing active invitations, return the most recent one
+    if (!existingInvitesError && existingInvites && existingInvites.length > 0) {
+      console.log('User already has active invitations. Returning the most recent one.');
+      const mostRecentInvite = existingInvites[0];
+      
+      // Get more details about this invitation
+      const { data: inviteDetails } = await supabase
+        .from('couple_invitations')
+        .select('*')
+        .eq('id', mostRecentInvite.id)
+        .single();
+      
+      return NextResponse.json({
+        success: true,
+        message: 'Using existing active invitation',
+        id: mostRecentInvite.id,
+        code: mostRecentInvite.code,
+        couple_id: coupleId,
+        expires_at: inviteDetails?.expires_at,
+        created_at: inviteDetails?.created_at
+      });
+    }
+    
+    // 4. Create the invitation directly
     const finalCode = code || Math.random().toString(36).substring(2, 8).toUpperCase();
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + (expiresInDays || 7)); // 7 days by default

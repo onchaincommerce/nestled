@@ -100,21 +100,7 @@ export async function POST(request: NextRequest) {
     if (redeemError) {
       console.error('Redeem Invite - RPC error, falling back to direct method:', redeemError);
       
-      // Check if the user is already in a couple
-      const { data: existingCouple, error: existingCoupleError } = await supabase
-        .from('couples_users')
-        .select('couple_id')
-        .eq('user_id', dbUserId)
-        .single();
-        
-      if (existingCouple && !existingCoupleError) {
-        return NextResponse.json(
-          { error: 'User is already in a couple', coupleId: existingCouple.couple_id },
-          { status: 400 }
-        );
-      }
-      
-      // Verify the invitation code
+      // Verify the invitation code first
       const now = new Date().toISOString();
       const { data: invitation, error: inviteError } = await supabase
         .from('couple_invitations')
@@ -135,6 +121,29 @@ export async function POST(request: NextRequest) {
       if (invitation.created_by === dbUserId) {
         return NextResponse.json(
           { error: 'You cannot join your own invitation' },
+          { status: 400 }
+        );
+      }
+      
+      // Check if the user is already in a couple - but only after validating the invite
+      const { data: existingCouple, error: existingCoupleError } = await supabase
+        .from('couples_users')
+        .select('couple_id')
+        .eq('user_id', dbUserId)
+        .single();
+        
+      if (existingCouple && !existingCoupleError) {
+        // If user is already part of the same couple as the invitation, return success
+        if (existingCouple.couple_id === invitation.couple_id) {
+          return NextResponse.json({
+            success: true,
+            message: 'You are already part of this couple',
+            coupleId: existingCouple.couple_id
+          });
+        }
+        
+        return NextResponse.json(
+          { error: 'User is already in a couple', coupleId: existingCouple.couple_id },
           { status: 400 }
         );
       }
