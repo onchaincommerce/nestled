@@ -474,16 +474,22 @@ export default function Dashboard() {
           </div>
         )}
         
-        {/* Show the connect partner card if user is not in a couple */}
+        {/* For users not in a couple, show both components side by side */}
         {isInCouple === false && (
-          <ConnectPartnerCard 
-            userID={userID} 
-            onSuccess={handleInviteSuccess}
-            onError={handleInviteError}
-          />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+            <ConnectPartnerCard 
+              userID={userID} 
+              onSuccess={handleInviteSuccess}
+              onError={handleInviteError}
+            />
+            <ActiveInviteCode
+              userID={userID}
+              baseUrl={baseUrl}
+            />
+          </div>
         )}
         
-        {/* Show the Active Invite Code component if user is in a couple */}
+        {/* For users in a couple, only show the Active Invite Code component */}
         {isInCouple === true && (
           <ActiveInviteCode
             userID={userID}
