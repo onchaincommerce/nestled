@@ -30,6 +30,7 @@ export default function InvitePartnerModal({
   const [success, setSuccess] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [timeRemaining, setTimeRemaining] = useState<{[key: string]: string}>({});
 
   // Add API key for direct access bypassing Passage auth
   const API_KEY = 'nestled-temp-api-key-12345';
@@ -70,6 +71,49 @@ export default function InvitePartnerModal({
     // Otherwise, add it as the first parameter
     return `${url}?apiKey=${API_KEY}`;
   };
+  
+  // Update time remaining for active invitations
+  useEffect(() => {
+    if (!isOpen || invitations.length === 0) return;
+    
+    const updateTimeRemaining = () => {
+      const now = new Date();
+      const newTimeRemaining: {[key: string]: string} = {};
+      
+      invitations.forEach(invite => {
+        if (!invite.redeemed_at) {
+          const expiresAt = new Date(invite.expires_at);
+          const diff = expiresAt.getTime() - now.getTime();
+          
+          if (diff <= 0) {
+            newTimeRemaining[invite.id] = 'Expired';
+          } else {
+            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            
+            if (days > 0) {
+              newTimeRemaining[invite.id] = `${days}d ${hours}h`;
+            } else if (hours > 0) {
+              newTimeRemaining[invite.id] = `${hours}h ${minutes}m`;
+            } else {
+              newTimeRemaining[invite.id] = `${minutes}m`;
+            }
+          }
+        }
+      });
+      
+      setTimeRemaining(newTimeRemaining);
+    };
+    
+    // Update immediately
+    updateTimeRemaining();
+    
+    // Then update every minute
+    const interval = setInterval(updateTimeRemaining, 60000);
+    
+    return () => clearInterval(interval);
+  }, [isOpen, invitations]);
   
   useEffect(() => {
     if (isOpen) {
@@ -145,6 +189,14 @@ export default function InvitePartnerModal({
     setSuccess(null);
     setIsCreatingInvite(true);
     
+    // Check if there's already an active invitation
+    const activeInvitations = invitations.filter(invite => !invite.redeemed_at);
+    if (activeInvitations.length > 0) {
+      setError('You already have an active invitation. Please wait until it expires or is redeemed.');
+      setIsCreatingInvite(false);
+      return;
+    }
+    
     try {
       // Generate a simple invitation code without going through complex APIs
       const code = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -174,19 +226,29 @@ export default function InvitePartnerModal({
       if (data.success) {
         setSuccess('Invitation created successfully');
         // Add the new invitation to the state directly
-        setInvitations([
-          {
-            id: data.id || crypto.randomUUID(),
-            code: code,
-            couple_id: data.couple_id,
-            created_at: new Date().toISOString(),
-            expires_at: data.expires_at || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-            inviteUrl: `${baseUrl}/invite/${code}`,
-            redeemed_at: null,
-            redeemed_by: null
-          },
-          ...invitations
-        ]);
+        const newInvitation = {
+          id: data.id || crypto.randomUUID(),
+          code: code,
+          couple_id: data.couple_id,
+          created_at: new Date().toISOString(),
+          expires_at: data.expires_at || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          inviteUrl: `${baseUrl}/invite/${code}`,
+          redeemed_at: null,
+          redeemed_by: null
+        };
+        setInvitations([newInvitation, ...invitations]);
+        
+        // Initialize time remaining for the new invitation
+        const now = new Date();
+        const expiresAt = new Date(newInvitation.expires_at);
+        const diff = expiresAt.getTime() - now.getTime();
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        
+        setTimeRemaining({
+          ...timeRemaining,
+          [newInvitation.id]: `${days}d ${hours}h`
+        });
       } else {
         setError('Failed to create invitation');
       }
@@ -219,6 +281,9 @@ export default function InvitePartnerModal({
       day: 'numeric'
     });
   };
+  
+  // Check if there's an active invitation
+  const hasActiveInvitation = invitations.some(invite => !invite.redeemed_at);
   
   if (!isOpen) return null;
   
@@ -257,11 +322,21 @@ export default function InvitePartnerModal({
             
             <button
               onClick={createInvitation}
-              disabled={isCreatingInvite}
-              className="w-full bg-gradient-to-r from-primary-600 to-primary-700 text-white px-5 py-2.5 rounded-lg hover:from-primary-700 hover:to-primary-800 transition-all duration-300 font-medium shadow-sm hover:shadow flex items-center justify-center"
+              disabled={isCreatingInvite || hasActiveInvitation}
+              className={`w-full px-5 py-2.5 rounded-lg transition-all duration-300 font-medium shadow-sm hover:shadow flex items-center justify-center ${
+                isCreatingInvite || hasActiveInvitation 
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                  : 'bg-gradient-to-r from-primary-600 to-primary-700 text-white hover:from-primary-700 hover:to-primary-800'
+              }`}
             >
-              {isCreatingInvite ? 'Creating...' : 'Create New Invitation'}
+              {isCreatingInvite ? 'Creating...' : hasActiveInvitation ? 'You already have an active invitation' : 'Create New Invitation'}
             </button>
+            
+            {hasActiveInvitation && (
+              <p className="text-xs text-gray-500 mt-2 text-center">
+                You can only have one active invitation at a time. Wait until your current invitation expires or is redeemed.
+              </p>
+            )}
           </div>
           
           <div>
@@ -278,45 +353,61 @@ export default function InvitePartnerModal({
             ) : (
               <div className="space-y-4">
                 {invitations.map(invite => (
-                  <div key={invite.id} className="border border-gray-200 rounded-lg p-4">
+                  <div key={invite.id} className={`border ${invite.redeemed_at ? 'border-green-200 bg-green-50/30' : 'border-gray-200'} rounded-lg p-4`}>
                     <div className="flex justify-between items-start mb-3">
                       <div>
                         <div className="font-semibold text-primary-800 text-lg">
                           Code: {invite.code}
                         </div>
-                        <div className="text-sm text-gray-500">
-                          Expires: {formatDate(invite.expires_at)}
+                        <div className="text-sm text-gray-500 flex items-center">
+                          {!invite.redeemed_at && (
+                            <>
+                              <span className={`inline-block w-2 h-2 rounded-full mr-1.5 ${
+                                timeRemaining[invite.id] === 'Expired' ? 'bg-red-500' : 'bg-green-500 animate-pulse'
+                              }`}></span>
+                              <span className="mr-2">
+                                {timeRemaining[invite.id] === 'Expired' ? 'Expired' : `Expires in: ${timeRemaining[invite.id] || '...'}`}
+                              </span>
+                            </>
+                          )}
+                          <span>
+                            {invite.redeemed_at ? 'Redeemed on: ' : 'Expires: '}{formatDate(invite.redeemed_at || invite.expires_at)}
+                          </span>
                         </div>
                       </div>
-                      <button
-                        onClick={() => copyToClipboard(invite.code, invite.code)}
-                        className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded-md transition-colors"
-                      >
-                        {copiedCode === invite.code ? 'Copied!' : 'Copy Code'}
-                      </button>
+                      {!invite.redeemed_at && (
+                        <button
+                          onClick={() => copyToClipboard(invite.code, invite.code)}
+                          className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded-md transition-colors"
+                        >
+                          {copiedCode === invite.code ? 'Copied!' : 'Copy Code'}
+                        </button>
+                      )}
                     </div>
                     
-                    <div className="mb-3">
-                      <div className="text-sm mb-1 font-medium text-gray-700">Share Link:</div>
-                      <div className="flex items-center">
-                        <div className="bg-gray-50 p-2 rounded text-sm text-gray-600 flex-1 truncate">
-                          {baseUrl}/invite/{invite.code}
+                    {!invite.redeemed_at && (
+                      <div className="mb-3">
+                        <div className="text-sm mb-1 font-medium text-gray-700">Share Link:</div>
+                        <div className="flex items-center">
+                          <div className="bg-gray-50 p-2 rounded text-sm text-gray-600 flex-1 truncate">
+                            {baseUrl}/invite/{invite.code}
+                          </div>
+                          <button
+                            onClick={() => copyToClipboard(`${baseUrl}/invite/${invite.code}`, invite.code + '_url')}
+                            className="ml-2 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded-md transition-colors whitespace-nowrap"
+                          >
+                            {copiedCode === invite.code + '_url' ? 'Copied!' : 'Copy Link'}
+                          </button>
                         </div>
-                        <button
-                          onClick={() => copyToClipboard(`${baseUrl}/invite/${invite.code}`, invite.code + '_url')}
-                          className="ml-2 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded-md transition-colors whitespace-nowrap"
-                        >
-                          {copiedCode === invite.code + '_url' ? 'Copied!' : 'Copy Link'}
-                        </button>
                       </div>
-                    </div>
+                    )}
                     
                     <div className="flex justify-between items-center text-sm">
                       <div className="text-gray-500">
                         Created: {formatDate(invite.created_at)}
                       </div>
-                      <div className={`${invite.redeemed_at ? 'text-green-600' : 'text-blue-600'} font-medium`}>
-                        {invite.redeemed_at ? 'Redeemed' : 'Active'}
+                      <div className={`${invite.redeemed_at ? 'text-green-600' : timeRemaining[invite.id] === 'Expired' ? 'text-red-600' : 'text-blue-600'} font-medium`}>
+                        {invite.redeemed_at ? 'Redeemed' : timeRemaining[invite.id] === 'Expired' ? 'Expired' : 'Active'}
                       </div>
                     </div>
                   </div>
@@ -335,6 +426,7 @@ export default function InvitePartnerModal({
             </ol>
             <div className="mt-4 text-sm text-gray-500">
               <p>Invitation codes expire after 7 days for security reasons.</p>
+              <p>You can only have one active invitation at a time.</p>
             </div>
           </div>
         </div>
