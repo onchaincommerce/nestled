@@ -2,58 +2,106 @@
 
 import { useState, useEffect } from 'react';
 
-type ActiveInviteCodeProps = {
+// Types
+interface ActiveInviteCodeProps {
   userID: string;
   baseUrl: string;
-};
+}
 
-type Invitation = {
-  id: string;
+interface InviteCodeData {
   code: string;
-  couple_id: string;
-  created_at: string;
   expires_at: string;
-  inviteUrl: string;
-  redeemed_at: string | null;
-  redeemed_by: string | null;
-};
+  created_at: string;
+  id: string;
+}
 
-export default function ActiveInviteCode({ userID, baseUrl }: ActiveInviteCodeProps) {
+const ActiveInviteCode = ({ userID, baseUrl }: ActiveInviteCodeProps) => {
   const [isLoading, setIsLoading] = useState(true);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [activeInviteCode, setActiveInviteCode] = useState<InviteCodeData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [activeInvitation, setActiveInvitation] = useState<Invitation | null>(null);
-  const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<string>('');
-  const [isCreatingInvite, setIsCreatingInvite] = useState(false);
-  const [success, setSuccess] = useState<string | null>(null);
-
+  const [copied, setCopied] = useState<string | null>(null);
+  
   // Add API key for direct access bypassing Passage auth
   const API_KEY = 'nestled-temp-api-key-12345';
-
-  // Update time remaining
+  
+  // Load the active invite code when userID changes
   useEffect(() => {
-    if (!activeInvitation) return;
+    if (!userID) return;
+    
+    const loadInviteCode = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        // Try to get any existing active invite
+        const response = await fetch(`/api/couples/direct-invite?passageId=${userID}`, {
+          headers: {
+            'Authorization': `Bearer ${API_KEY}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (!response.ok) {
+          if (response.status === 404) {
+            // No active invite code or no couple - we'll handle creating one later
+            setActiveInviteCode(null);
+            return;
+          }
+          setError('Failed to load invite code. Please try again later.');
+          console.error('Error response:', await response.text());
+          return;
+        }
+        
+        const data = await response.json();
+        
+        if (data.invitations && data.invitations.length > 0) {
+          setActiveInviteCode(data.invitations[0]);
+        } else if (data.new_couple_created) {
+          // A new couple was created, but no invites exist yet
+          // Let's create one right away
+          await generateNewCode();
+        } else {
+          setActiveInviteCode(null);
+        }
+      } catch (e) {
+        console.error('Error loading invite code:', e);
+        setError('Failed to load invite code. Please try again later.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadInviteCode();
+  }, [userID]);
+  
+  // Update the time remaining display
+  useEffect(() => {
+    if (!activeInviteCode) return;
     
     const updateTimeRemaining = () => {
       const now = new Date();
-      const expiresAt = new Date(activeInvitation.expires_at);
+      const expiresAt = new Date(activeInviteCode.expires_at);
       const diff = expiresAt.getTime() - now.getTime();
       
       if (diff <= 0) {
         setTimeRemaining('Expired');
-        setActiveInvitation(null); // Remove expired invitation
+        // Optionally, refresh the code if it's expired
+        generateNewCode();
+        return;
+      }
+      
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      
+      if (days > 0) {
+        setTimeRemaining(`${days}d ${hours}h remaining`);
+      } else if (hours > 0) {
+        setTimeRemaining(`${hours}h ${minutes}m remaining`);
       } else {
-        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-        
-        if (days > 0) {
-          setTimeRemaining(`${days}d ${hours}h`);
-        } else if (hours > 0) {
-          setTimeRemaining(`${hours}h ${minutes}m`);
-        } else {
-          setTimeRemaining(`${minutes}m`);
-        }
+        setTimeRemaining(`${minutes}m remaining`);
       }
     };
     
@@ -64,267 +112,171 @@ export default function ActiveInviteCode({ userID, baseUrl }: ActiveInviteCodePr
     const interval = setInterval(updateTimeRemaining, 60000);
     
     return () => clearInterval(interval);
-  }, [activeInvitation]);
-
-  // Load invitations on component mount
-  useEffect(() => {
-    if (userID) {
-      loadInvitations();
-    }
-  }, [userID]);
-
-  // Format date for display
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
-  };
-
-  const loadInvitations = async () => {
-    if (!userID) return;
-    
-    setIsLoading(true);
-    setError(null);
+  }, [activeInviteCode]);
+  
+  // Generate a new invite code
+  const generateNewCode = async () => {
+    if (!userID || isGenerating) return;
     
     try {
-      // First try the standard API
-      const response = await fetch('/api/couples/invite');
+      setIsGenerating(true);
+      setError(null);
       
-      if (response.ok) {
-        const data = await response.json();
-        const activeInvites = (data.invitations || []).filter((invite: Invitation) => !invite.redeemed_at);
-        setActiveInvitation(activeInvites.length > 0 ? activeInvites[0] : null);
-        setIsLoading(false);
-        return;
-      }
-      
-      console.error('Standard API failed, status:', response.status, 'trying fallback...');
-      
-      // Use the auth-bypass endpoint as a fallback
-      const inviteBypassUrl = `/api/couples/auth-bypass/invite?passageId=${userID}`;
-      const inviteResponse = await fetch(inviteBypassUrl, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${API_KEY}`,
-          'Content-Type': 'application/json'
-        },
-      });
-      
-      if (!inviteResponse.ok) {
-        console.error('Invitations API failed:', await inviteResponse.text());
-        setError('Failed to load invitations');
-        setIsLoading(false);
-        return;
-      }
-      
-      const inviteData = await inviteResponse.json();
-      const activeInvites = (inviteData.invitations || []).filter((invite: Invitation) => !invite.redeemed_at);
-      setActiveInvitation(activeInvites.length > 0 ? activeInvites[0] : null);
-    } catch (error) {
-      console.error('Error loading invitations:', error);
-      setError('Failed to load invitations');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const createInvitation = async () => {
-    setError(null);
-    setSuccess(null);
-    setIsCreatingInvite(true);
-    
-    try {
-      // Generate a simple invitation code without going through complex APIs
-      const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-      
-      // Send directly to our service role bypassing all other logic
-      const directResponse = await fetch('/api/couples/direct-invite', {
+      const response = await fetch('/api/couples/direct-invite', {
         method: 'POST',
         headers: {
+          'Authorization': `Bearer ${API_KEY}`,
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${API_KEY}`
         },
         body: JSON.stringify({
           passageId: userID,
-          code: code,
-          expiresInDays: 7
-        })
+        }),
       });
       
-      if (!directResponse.ok) {
-        const errorText = await directResponse.text();
-        console.error('Direct invite API failed:', errorText);
-        setError(`Failed to create invitation. Please try again later.`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Failed to generate invite code:', errorText);
+        setError('Failed to generate invite code. Please try again later.');
         return;
       }
       
-      const data = await directResponse.json();
+      const data = await response.json();
+      
       if (data.success) {
-        setSuccess('Invitation created successfully');
-        // Set the new invitation
-        const newInvitation = {
-          id: data.id || crypto.randomUUID(),
-          code: code,
-          couple_id: data.couple_id,
+        setActiveInviteCode({
+          id: data.id,
+          code: data.code,
+          expires_at: data.expires_at,
           created_at: new Date().toISOString(),
-          expires_at: data.expires_at || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-          inviteUrl: `${baseUrl}/invite/${code}`,
-          redeemed_at: null,
-          redeemed_by: null
-        };
-        setActiveInvitation(newInvitation);
-        
-        // Initialize time remaining
-        const now = new Date();
-        const expiresAt = new Date(newInvitation.expires_at);
-        const diff = expiresAt.getTime() - now.getTime();
-        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        setTimeRemaining(`${days}d ${hours}h`);
-        
-        // Clear success message after a few seconds
-        setTimeout(() => {
-          setSuccess(null);
-        }, 3000);
+        });
       } else {
-        setError('Failed to create invitation');
+        setError(data.error || 'Failed to generate invite code. Please try again later.');
       }
-    } catch (error) {
-      setError('An unexpected error occurred');
-      console.error('Error creating invitation:', error);
+    } catch (e) {
+      console.error('Error generating invite code:', e);
+      setError('Failed to generate invite code. Please try again later.');
     } finally {
-      setIsCreatingInvite(false);
+      setIsGenerating(false);
     }
   };
-
-  const copyToClipboard = (text: string, code: string) => {
-    navigator.clipboard.writeText(text).then(
-      () => {
-        setCopiedCode(code);
-        setTimeout(() => setCopiedCode(null), 3000);
-      },
-      (err) => {
-        console.error('Could not copy text: ', err);
-      }
-    );
+  
+  const copyToClipboard = (text: string, type: string) => {
+    navigator.clipboard.writeText(text)
+      .then(() => {
+        setCopied(type);
+        setTimeout(() => setCopied(null), 3000);
+      })
+      .catch(err => {
+        console.error('Failed to copy:', err);
+      });
   };
-
-  if (isLoading) {
-    return (
-      <div className="bg-gradient-to-br from-white/90 to-secondary-50/80 backdrop-blur-sm rounded-2xl shadow-sm border border-secondary-100/30 p-5 mb-5">
-        <div className="flex justify-center">
-          <div className="animate-pulse text-primary-600">Loading invite code...</div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="bg-gradient-to-br from-white/90 to-secondary-50/80 backdrop-blur-sm rounded-2xl shadow-sm border border-secondary-100/30 p-5 mb-5">
-        <div className="text-red-600 text-center">
+  
+  // Generate the invite link
+  const getInviteLink = () => {
+    if (!activeInviteCode) return '';
+    return `${baseUrl}/invite/${activeInviteCode.code}`;
+  };
+  
+  return (
+    <div className="bg-gradient-to-br from-white/90 to-secondary-50/80 backdrop-blur-sm rounded-2xl shadow-sm border border-secondary-100/30 p-5 transition-all duration-300 hover:shadow-md">
+      <h2 className="text-xl font-semibold text-secondary-800 mb-3">Invite Partner</h2>
+      
+      {error && (
+        <div className="mb-4 p-3 bg-red-50/90 text-red-700 rounded-xl border border-red-100/50">
           {error}
+          <button 
+            onClick={() => setError(null)} 
+            className="ml-2 text-red-800 font-medium underline text-sm"
+          >
+            Dismiss
+          </button>
         </div>
-      </div>
-    );
-  }
-
-  if (!activeInvitation) {
-    return (
-      <div className="bg-gradient-to-br from-white/90 to-secondary-50/80 backdrop-blur-sm rounded-2xl shadow-sm border border-secondary-100/30 p-5 mb-5 hover:shadow-md transition-all duration-300">
-        <div className="flex flex-col gap-4">
-          <div>
-            <h3 className="text-lg font-semibold text-primary-800 mb-1">Generate Partner Invite Code</h3>
-            <p className="text-gray-600 text-sm">Create an invite code to share with your partner so they can connect with you.</p>
+      )}
+      
+      {isLoading ? (
+        <div className="text-center py-4">
+          <div className="animate-pulse flex flex-col items-center justify-center">
+            <div className="h-8 w-40 bg-gray-200 rounded mb-3"></div>
+            <div className="h-6 w-24 bg-gray-200 rounded mb-4"></div>
+            <div className="h-10 w-full bg-gray-200 rounded"></div>
+          </div>
+        </div>
+      ) : activeInviteCode ? (
+        <div>
+          <div className="p-4 bg-secondary-50/70 rounded-xl border border-secondary-100/50 mb-4">
+            <div className="flex justify-between items-center mb-1">
+              <p className="text-secondary-800 font-semibold">Invite Code:</p>
+              <div className="text-xs bg-secondary-100/80 text-secondary-700 px-2 py-0.5 rounded-full">
+                {timeRemaining || 'Calculating...'}
+              </div>
+            </div>
+            <div className="flex items-center">
+              <span className="font-mono font-medium text-lg text-secondary-700 tracking-wider mr-2">
+                {activeInviteCode.code}
+              </span>
+              <button 
+                onClick={() => copyToClipboard(activeInviteCode.code, 'code')}
+                className="text-xs bg-secondary-100 hover:bg-secondary-200 text-secondary-700 rounded-md px-2 py-1 transition-colors"
+              >
+                {copied === 'code' ? 'Copied!' : 'Copy'}
+              </button>
+            </div>
           </div>
           
-          {success && (
-            <div className="bg-green-50 border border-green-100 text-green-700 px-4 py-3 rounded-lg">
-              {success}
+          <div className="mb-4">
+            <p className="text-sm text-gray-600 mb-2">Share this link with your partner:</p>
+            <div className="flex items-center">
+              <div className="flex-1 bg-gray-50 border border-gray-200 rounded-md p-2 mr-2 truncate text-sm">
+                {getInviteLink()}
+              </div>
+              <button 
+                onClick={() => copyToClipboard(getInviteLink(), 'link')}
+                className="text-xs bg-secondary-100 hover:bg-secondary-200 text-secondary-700 rounded-md px-2 py-1 transition-colors whitespace-nowrap"
+              >
+                {copied === 'link' ? 'Copied!' : 'Copy Link'}
+              </button>
             </div>
-          )}
+          </div>
+          
+          <div className="text-xs text-gray-500 mb-3">
+            <p>This invite code will expire in 7 days or when used.</p>
+          </div>
           
           <button
-            onClick={createInvitation}
-            disabled={isCreatingInvite}
-            className={`w-full bg-gradient-to-r from-secondary-600 to-secondary-700 text-white px-5 py-2.5 rounded-xl hover:from-secondary-700 hover:to-secondary-800 transition-all duration-300 font-medium shadow-sm hover:shadow flex items-center justify-center ${isCreatingInvite ? 'opacity-70 cursor-not-allowed' : ''}`}
+            onClick={generateNewCode}
+            disabled={isGenerating}
+            className="text-sm text-secondary-700 hover:text-secondary-800 hover:underline flex items-center justify-center w-full disabled:opacity-50 disabled:hover:no-underline"
           >
-            {isCreatingInvite ? (
+            {isGenerating ? 'Generating...' : 'Generate New Code'}
+          </button>
+        </div>
+      ) : (
+        <div>
+          <p className="text-gray-600 mb-4">
+            Generate an invite code to connect with your partner on Nestled.
+          </p>
+          
+          <button
+            onClick={generateNewCode}
+            disabled={isGenerating}
+            className="w-full bg-gradient-to-r from-secondary-600 to-secondary-700 text-white px-5 py-2.5 rounded-xl hover:from-secondary-700 hover:to-secondary-800 transition-all duration-300 font-medium shadow-sm hover:shadow flex items-center justify-center disabled:opacity-50"
+          >
+            {isGenerating ? (
               <>
-                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
                 Generating...
               </>
             ) : (
-              <>
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1.5" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
-                  <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
-                </svg>
-                Generate Invite Code
-              </>
+              'Generate Invite Code'
             )}
           </button>
         </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="bg-gradient-to-br from-white/90 to-secondary-50/80 backdrop-blur-sm rounded-2xl shadow-sm border border-secondary-100/30 p-5 mb-5 hover:shadow-md transition-all duration-300">
-      <div className="flex flex-col gap-4">
-        <div>
-          <h3 className="text-lg font-semibold text-primary-800 mb-1">Your Partner Invite Code</h3>
-          <p className="text-gray-600 text-sm">Share this code with your partner to connect your accounts.</p>
-        </div>
-        
-        <div className="bg-white/70 p-4 rounded-xl border border-secondary-200/30">
-          <div className="flex justify-between items-center mb-2">
-            <div className="font-bold text-2xl text-primary-800 tracking-wider">{activeInvitation.code}</div>
-            <button
-              onClick={() => copyToClipboard(activeInvitation.code, 'code')}
-              className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded-md transition-colors"
-            >
-              {copiedCode === 'code' ? 'Copied!' : 'Copy Code'}
-            </button>
-          </div>
-          
-          <div className="flex items-center text-sm text-gray-600 mt-2">
-            <span className={`inline-block w-2 h-2 rounded-full mr-1.5 ${
-              timeRemaining === 'Expired' ? 'bg-red-500' : 'bg-green-500 animate-pulse'
-            }`}></span>
-            <span>
-              {timeRemaining === 'Expired' ? 'Expired' : `Expires in: ${timeRemaining}`}
-            </span>
-            <span className="mx-2">•</span>
-            <span>Expires: {formatDate(activeInvitation.expires_at)}</span>
-          </div>
-        </div>
-        
-        <div>
-          <div className="text-sm mb-1 font-medium text-gray-700">Share Link:</div>
-          <div className="flex items-center">
-            <div className="bg-gray-50 p-2 rounded text-sm text-gray-600 flex-1 truncate">
-              {baseUrl}/invite/{activeInvitation.code}
-            </div>
-            <button
-              onClick={() => copyToClipboard(`${baseUrl}/invite/${activeInvitation.code}`, 'link')}
-              className="ml-2 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded-md transition-colors whitespace-nowrap"
-            >
-              {copiedCode === 'link' ? 'Copied!' : 'Copy Link'}
-            </button>
-          </div>
-        </div>
-        
-        <p className="text-xs text-gray-500">
-          Your partner will need to sign up (or log in) to Nestled and enter this code to connect with you.
-        </p>
-      </div>
+      )}
     </div>
   );
-} 
+};
+
+export default ActiveInviteCode; 

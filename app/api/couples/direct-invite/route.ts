@@ -248,11 +248,48 @@ export async function GET(request: NextRequest) {
       .single();
     
     if (coupleUserError || !coupleUserData) {
-      console.error('User not in a couple:', coupleUserError);
-      return NextResponse.json(
-        { error: 'User is not part of any couple', details: coupleUserError }, 
-        { status: 404 }
-      );
+      // The user isn't in a couple yet - create one so they can generate invites
+      console.log('User not in a couple for GET invites. Creating a new couple.');
+      const { data: newCouple, error: newCoupleError } = await supabase
+        .from('couples')
+        .insert({
+          name: 'New Couple',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+      
+      if (newCoupleError || !newCouple) {
+        console.error('Failed to create couple for GET invites:', newCoupleError);
+        return NextResponse.json(
+          { error: 'Failed to create couple', details: newCoupleError }, 
+          { status: 500 }
+        );
+      }
+      
+      // Link the user to the couple
+      const { error: linkError } = await supabase
+        .from('couples_users')
+        .insert({
+          couple_id: newCouple.id,
+          user_id: userData.id
+        });
+      
+      if (linkError) {
+        console.error('Failed to link user to couple for GET invites:', linkError);
+        return NextResponse.json(
+          { error: 'Failed to link user to couple', details: linkError }, 
+          { status: 500 }
+        );
+      }
+      
+      // Return empty invitations list since this is a new couple
+      return NextResponse.json({
+        invitations: [],
+        new_couple_created: true,
+        couple_id: newCouple.id
+      });
     }
     
     // Get all active invitations for this couple
