@@ -15,8 +15,9 @@ export async function GET(request: Request) {
       }, { status: 500 });
     }
     
-    // 1. Create a test user ID
-    const testUserId = 'test_user_' + Date.now();
+    // 1. Create a proper UUID test user ID instead of a string
+    // This is important as the 'id' field in users is UUID type
+    const testUserId = crypto.randomUUID();
     
     // 2. Create JWT with the same structure as our getSupabaseWithUser function
     const payload = {
@@ -34,6 +35,8 @@ export async function GET(request: Request) {
       }, { status: 500 });
     }
     
+    console.log('JWT Secret hash (for comparison):', require('crypto').createHash('sha256').update(jwtSecret).digest('hex').substring(0, 10));
+    
     const token = jwt.sign(payload, jwtSecret);
     
     // 4. Create a Supabase client with this JWT in the authorization header
@@ -45,46 +48,74 @@ export async function GET(request: Request) {
       }
     });
     
-    // 5. Try to insert a record directly
+    // First, try with anonymous client without JWT
+    console.log('Attempting with anon client first (no JWT)');
+    const anonClient = createClient(supabaseUrl, supabaseAnonKey);
+    
+    const { data: anonData, error: anonError } = await anonClient
+      .from('users')
+      .insert({
+        id: testUserId,
+        email: `test_${testUserId.substring(0, 8)}@example.com`,
+        username: `test_${testUserId.substring(0, 8)}`
+      })
+      .select();
+      
+    if (anonError) {
+      console.log('Anonymous insert failed:', anonError);
+    } else {
+      console.log('Anonymous insert succeeded!', anonData);
+      return NextResponse.json({
+        success: true,
+        message: 'User created with anonymous client successfully',
+        userId: testUserId,
+        userData: anonData
+      });
+    }
+    
+    // 5. Try to insert a record directly with JWT
+    console.log('Anonymous insert failed, trying with JWT auth');
     const { data, error } = await supabase
       .from('users')
       .insert({
         id: testUserId,
-        email: `test_${testUserId}@example.com`
+        email: `test_${testUserId.substring(0, 8)}@example.com`,
+        username: `test_${testUserId.substring(0, 8)}`
       })
       .select();
     
     if (error) {
-      console.error('Supabase error:', error);
+      console.error('Supabase JWT auth error:', error);
+      // Check if the error is a duplicate key error
+      if (error.code === '23505') {
+        return NextResponse.json({ 
+          success: false, 
+          message: 'User already exists - duplicate key error', 
+          error: error 
+        });
+      }
+      
       return NextResponse.json({ 
         success: false, 
-        message: 'Failed to insert test user', 
-        error: error 
+        message: 'Failed to insert test user with JWT auth', 
+        error: error,
+        jwt_payload: payload,
+        supabase_url: supabaseUrl
       });
     }
     
-    // Then try to create a test entry to verify RLS
-    const { data: entryData, error: entryError } = await supabase
-      .from('test_entries')
-      .insert({
-        user_id: testUserId,
-        content: 'Test entry from JWT test endpoint'
-      })
-      .select();
-      
     return NextResponse.json({
       success: true,
-      message: 'JWT test completed',
+      message: 'JWT test completed successfully',
       userId: testUserId,
-      userData: data,
-      entryData: entryData,
-      entryError: entryError
+      userData: data
     });
   } catch (error) {
     console.error('Error in test-jwt endpoint:', error);
     return NextResponse.json({ 
       success: false, 
-      error: (error as Error).message || 'Unknown error' 
+      error: (error as Error).message || 'Unknown error',
+      stack: (error as Error).stack
     }, { status: 500 });
   }
 } 

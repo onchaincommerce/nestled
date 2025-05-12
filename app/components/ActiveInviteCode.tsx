@@ -45,23 +45,26 @@ const ActiveInviteCode = ({ userID, baseUrl }: ActiveInviteCodeProps) => {
         
         if (!response.ok) {
           if (response.status === 404) {
-            // No active invite code or no couple - we'll handle creating one later
+            // No active invite code or no couple - we'll handle creating one when user clicks the button
             setActiveInviteCode(null);
+            setIsLoading(false);
             return;
           }
           setError('Failed to load invite code. Please try again later.');
           console.error('Error response:', await response.text());
+          setIsLoading(false);
           return;
         }
         
         const data = await response.json();
         
         if (data.invitations && data.invitations.length > 0) {
+          // User has an existing active invite code
           setActiveInviteCode(data.invitations[0]);
         } else if (data.new_couple_created) {
-          // A new couple was created, but no invites exist yet
-          // Let's create one right away
-          await generateNewCode();
+          // A new couple was created, but we won't auto-generate an invite code
+          // User must explicitly click the button to generate one
+          setActiveInviteCode(null);
         } else {
           setActiveInviteCode(null);
         }
@@ -87,8 +90,8 @@ const ActiveInviteCode = ({ userID, baseUrl }: ActiveInviteCodeProps) => {
       
       if (diff <= 0) {
         setTimeRemaining('Expired');
-        // Optionally, refresh the code if it's expired
-        generateNewCode();
+        // We won't auto-refresh expired codes
+        setActiveInviteCode(null);
         return;
       }
       
@@ -114,7 +117,7 @@ const ActiveInviteCode = ({ userID, baseUrl }: ActiveInviteCodeProps) => {
     return () => clearInterval(interval);
   }, [activeInviteCode]);
   
-  // Generate a new invite code
+  // Generate a new invite code - explicit user action only
   const generateNewCode = async () => {
     if (!userID || isGenerating) return;
     
