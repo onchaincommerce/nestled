@@ -63,20 +63,41 @@ export async function POST(request: NextRequest) {
       .eq('user_id', userId)
       .single();
     
-    // If user is not in a couple, create one using raw SQL to bypass any RLS issues
+    // If user is not in a couple, create one with direct SQL that bypasses RLS
     let coupleId: string;
     
     if (coupleError || !coupleData) {
-      // Create a couple using raw SQL
-      const { data: newCouple, error: createError } = await supabase
-        .rpc('create_couple_for_user', {
-          p_user_id: userId
+      // Create a couple directly - This is the simplest approach
+      const { data: newCouple, error: newCoupleError } = await supabase
+        .from('couples')
+        .insert({
+          name: 'New Couple',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+      
+      if (newCoupleError || !newCouple) {
+        console.error('Failed to create couple:', newCoupleError);
+        return NextResponse.json(
+          { error: 'Failed to create couple', details: newCoupleError }, 
+          { status: 500 }
+        );
+      }
+      
+      // Now link the user to the couple
+      const { error: linkError } = await supabase
+        .from('couples_users')
+        .insert({
+          couple_id: newCouple.id,
+          user_id: userId
         });
       
-      if (createError || !newCouple) {
-        console.error('Failed to create couple:', createError);
+      if (linkError) {
+        console.error('Failed to link user to couple:', linkError);
         return NextResponse.json(
-          { error: 'Failed to create couple', details: createError }, 
+          { error: 'Failed to link user to couple', details: linkError }, 
           { status: 500 }
         );
       }
@@ -91,49 +112,29 @@ export async function POST(request: NextRequest) {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + (expiresInDays || 7)); // 7 days by default
     
-    // Create invitation with raw SQL to avoid RLS
-    const { data: invitation, error: inviteError } = await supabase
-      .rpc('create_direct_invitation', {
-        p_code: finalCode,
-        p_couple_id: coupleId,
-        p_created_by: userId,
-        p_expires_at: expiresAt.toISOString()
-      });
+    // Create invitation directly
+    const { data: inviteData, error: inviteError } = await supabase
+      .from('couple_invitations')
+      .insert({
+        code: finalCode,
+        couple_id: coupleId,
+        created_by: userId,
+        expires_at: expiresAt.toISOString()
+      })
+      .select()
+      .single();
     
     if (inviteError) {
       console.error('Failed to create invitation:', inviteError);
-      
-      // Fallback to direct insert if RPC fails
-      const { data: fallbackInvite, error: fallbackError } = await supabase
-        .from('couple_invitations')
-        .insert({
-          code: finalCode,
-          couple_id: coupleId,
-          created_by: userId,
-          expires_at: expiresAt.toISOString()
-        })
-        .select()
-        .single();
-      
-      if (fallbackError) {
-        return NextResponse.json(
-          { error: 'Failed to create invitation', details: fallbackError }, 
-          { status: 500 }
-        );
-      }
-      
-      return NextResponse.json({
-        success: true,
-        id: fallbackInvite.id,
-        code: finalCode,
-        couple_id: coupleId,
-        expires_at: expiresAt.toISOString()
-      });
+      return NextResponse.json(
+        { error: 'Failed to create invitation', details: inviteError }, 
+        { status: 500 }
+      );
     }
     
     return NextResponse.json({
       success: true,
-      id: invitation?.id,
+      id: inviteData.id,
       code: finalCode,
       couple_id: coupleId,
       expires_at: expiresAt.toISOString()
@@ -150,62 +151,105 @@ export async function POST(request: NextRequest) {
 // Get invitations for a couple directly
 export async function GET(request: NextRequest) {
   try {
-    // Check for basic API key auth
+    // API Key for simple validation
+    const API_KEY = process.env.INVITE_API_KEY || 'nestled-temp-api-key-12345';
+    
+    // Basic validation
     const authorization = request.headers.get('Authorization');
     const apiKey = authorization?.split(' ')[1];
     
     if (apiKey !== API_KEY) {
-      console.error(`Invalid API key: got "${apiKey}" expected "${API_KEY}"`);
-      return NextResponse.json(
-        { error: 'Invalid API key' },
-        { status: 401 }
-      );
+      console.error('Invalid API key');
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
-    // Get couple ID from query parameters
+    // Get passage ID from query parameters
     const searchParams = request.nextUrl.searchParams;
-    const coupleId = searchParams.get('coupleId');
+    const passageId = searchParams.get('passageId');
     
-    if (!coupleId) {
+    if (!passageId) {
       return NextResponse.json(
-        { error: 'Missing required query parameter: coupleId' },
+        { error: 'Missing required parameter: passageId' },
         { status: 400 }
       );
     }
     
-    console.log('Getting invitations for couple:', coupleId);
+    // Initialize Supabase with the service key to bypass RLS
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+    const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
     
-    const supabase = getAdminSupabase();
-    
-    // Get all active invitations for this couple
-    const now = new Date().toISOString();
-    const { data: invitations, error: inviteError } = await supabase
-      .from('couple_invitations')
-      .select('*')
-      .eq('couple_id', coupleId)
-      .gt('expires_at', now)
-      .order('created_at', { ascending: false });
-      
-    if (inviteError) {
-      console.error('Error fetching invitations:', inviteError);
+    if (!supabaseUrl || !supabaseKey) {
       return NextResponse.json(
-        { error: 'Error fetching invitations', details: inviteError },
+        { error: 'Server configuration error' }, 
         { status: 500 }
       );
     }
     
-    console.log('Found', invitations?.length || 0, 'invitations');
+    // Create client with admin privileges
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      auth: { persistSession: false, autoRefreshToken: false }
+    });
+    
+    // Get the user ID from passage_id
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('passage_id', passageId)
+      .single();
+    
+    if (userError || !userData) {
+      console.error('User not found:', userError);
+      return NextResponse.json(
+        { error: 'User not found', details: userError }, 
+        { status: 404 }
+      );
+    }
+    
+    // Get the couple ID for this user
+    const { data: coupleUserData, error: coupleUserError } = await supabase
+      .from('couples_users')
+      .select('couple_id')
+      .eq('user_id', userData.id)
+      .single();
+    
+    if (coupleUserError || !coupleUserData) {
+      console.error('User not in a couple:', coupleUserError);
+      return NextResponse.json(
+        { error: 'User is not part of any couple', details: coupleUserError }, 
+        { status: 404 }
+      );
+    }
+    
+    // Get all active invitations for this couple
+    const now = new Date().toISOString();
+    const { data: invitationsData, error: invitationsError } = await supabase
+      .from('couple_invitations')
+      .select('*')
+      .eq('couple_id', coupleUserData.couple_id)
+      .gt('expires_at', now)
+      .order('created_at', { ascending: false });
+    
+    if (invitationsError) {
+      console.error('Error fetching invitations:', invitationsError);
+      return NextResponse.json(
+        { error: 'Error fetching invitations', details: invitationsError }, 
+        { status: 500 }
+      );
+    }
+    
+    // Process invitations to add URLs
+    const invitationsWithUrls = invitationsData.map((invite: any) => ({
+      ...invite,
+      inviteUrl: `/invite/${invite.code}`
+    }));
     
     return NextResponse.json({
-      invitations: (invitations || []).map((invite: any) => ({
-        ...invite,
-        inviteUrl: `${request.nextUrl.origin}/invite/${invite.code}`
-      }))
+      invitations: invitationsWithUrls
     });
   } catch (error) {
     console.error('Error in direct-invite GET endpoint:', error);
     return NextResponse.json(
-      { error: (error as Error).message || 'Unknown error' },
+      { error: (error as Error).message || 'Unknown error' }, 
       { status: 500 }
     );
   }

@@ -7,6 +7,7 @@ import { PassageUserInterface } from '@/utils/passage-types';
 import { handleSafeSignOut } from '@/app/pwa-register';
 import InvitePartnerModal from '@/app/components/InvitePartnerModal';
 import ConnectPartnerCard from '@/app/components/ConnectPartnerCard';
+import ActiveInviteCode from '@/app/components/ActiveInviteCode';
 
 // This is a client component so we'll handle authentication on the client side
 export default function Dashboard() {
@@ -477,6 +478,14 @@ export default function Dashboard() {
             userID={userID} 
             onSuccess={handleInviteSuccess}
             onError={handleInviteError}
+          />
+        )}
+        
+        {/* Active Invite Code - show when user is in a couple */}
+        {isInCouple && (
+          <ActiveInviteCode
+            userID={userID}
+            baseUrl={baseUrl}
           />
         )}
         
