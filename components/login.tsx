@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 type PassageLoginProps = {
@@ -51,38 +50,28 @@ const PassageLogin = ({ inviteCodeFromUrl }: PassageLoginProps) => {
       {/* Background gradient animation */}
       <div className="absolute inset-0 bg-gradient-to-br from-primary-100 via-secondary-100 to-accent-100 animate-float opacity-90"></div>
       
-      {/* Content with logo */}
+      {/* Content */}
       <div className="relative p-8 backdrop-blur-sm bg-white/60">
-        <div className="flex justify-center mb-6">
-          <div className="w-24 h-24 relative">
-            <Image 
-              src="/icons/nestled_logo.png" 
-              alt="Nestled Logo"
-              width={96}
-              height={96}
-              className="object-contain animate-float"
-            />
-          </div>
-        </div>
-        
         {/* @ts-ignore - passage-auth is a custom element from Passage */}
         <passage-auth app-id={passageAppId}></passage-auth>
         
-        {/* Invite code field */}
-        <div className="mt-6">
+        {/* Invite code field - optional */}
+        <div className="mt-6 p-4 bg-white/50 rounded-xl border border-secondary-100/30">
           <label htmlFor="invite-code" className="block text-sm font-medium text-primary-700 mb-1">
-            Have an invite code?
+            Joining your partner? (Optional)
           </label>
           <input
             type="text"
             id="invite-code"
-            placeholder="Enter code (optional)"
+            placeholder="Enter invite code (if you have one)"
             value={inviteCode}
             onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-center uppercase"
           />
           <p className="text-xs text-gray-500 mt-1 text-center">
-            An invite code will connect you with your partner
+            Only needed if your partner has already created an account and invited you.
+            <br />
+            <span className="font-medium">First time users can skip this step.</span>
           </p>
         </div>
         

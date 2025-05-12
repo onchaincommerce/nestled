@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState, Suspense } from 'react';
-import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import PassageLogin from '@/components/login';
@@ -130,44 +129,6 @@ function HomeContent() {
           </div>
         </div>
       </section>
-
-      {/* PWA Install Prompt */}
-      <div className="bg-gradient-to-r from-primary-100 to-primary-200 py-4 text-center">
-        <p className="text-primary-700 text-sm font-medium flex items-center justify-center">
-          <span className="inline-block mr-2">📱</span> Install this app on your home screen for the best experience!
-        </p>
-      </div>
-
-      {/* Privacy note */}
-      <div className="bg-gradient-to-r from-secondary-100 to-accent-100 py-6 text-center">
-        <p className="text-secondary-700 text-sm flex items-center justify-center font-medium">
-          <span className="mr-2">🔒</span> Private by default. Your data stays between you.
-        </p>
-      </div>
-      
-      {/* Footer */}
-      <footer className="bg-white/80 backdrop-blur-sm py-6 border-t border-gray-200/60">
-        <div className="container mx-auto flex justify-between items-center px-4">
-          <div className="text-sm text-gray-500 flex items-center">
-            <Image 
-              src="/icons/nestled_logo.png" 
-              alt="Nestled Logo"
-              width={24}
-              height={24}
-              className="mr-2"
-            />
-            © {new Date().getFullYear()} Nestled
-          </div>
-          <div className="flex space-x-4">
-            <Link href="/privacy" className="text-sm text-gray-500 hover:text-primary-600 transition-colors">
-              Privacy
-            </Link>
-            <Link href="/terms" className="text-sm text-gray-500 hover:text-primary-600 transition-colors">
-              Terms
-            </Link>
-          </div>
-        </div>
-      </footer>
     </main>
   );
 }
