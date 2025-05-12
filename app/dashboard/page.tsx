@@ -474,7 +474,7 @@ export default function Dashboard() {
           </div>
         )}
         
-        {/* Always show the connect partner card if not in a couple */}
+        {/* Show the connect partner card if user is not in a couple */}
         {isInCouple === false && (
           <ConnectPartnerCard 
             userID={userID} 
@@ -483,7 +483,7 @@ export default function Dashboard() {
           />
         )}
         
-        {/* Show the Active Invite Code component only if user is in a couple */}
+        {/* Show the Active Invite Code component if user is in a couple */}
         {isInCouple === true && (
           <ActiveInviteCode
             userID={userID}
