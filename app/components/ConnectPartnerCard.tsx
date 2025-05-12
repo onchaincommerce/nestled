@@ -52,7 +52,7 @@ export default function ConnectPartnerCard({ userID, onSuccess, onError }: Conne
   };
 
   return (
-    <div className="bg-gradient-to-br from-white/90 to-secondary-50/80 backdrop-blur-sm rounded-2xl shadow-sm border border-secondary-100/30 p-5 mb-5 hover:shadow-md transition-all duration-300">
+    <div className="bg-gradient-to-br from-white/90 to-primary-50/80 backdrop-blur-sm rounded-2xl shadow-sm border border-primary-100/30 p-5 mb-5 hover:shadow-md transition-all duration-300">
       <div className="flex flex-col gap-4">
         <div>
           <h3 className="text-lg font-semibold text-primary-800 mb-1">Connect with Your Partner</h3>
@@ -65,13 +65,13 @@ export default function ConnectPartnerCard({ userID, onSuccess, onError }: Conne
             placeholder="Enter invite code"
             value={inviteCode}
             onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-            className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-center uppercase"
+            className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-center uppercase tracking-wider text-lg font-medium"
           />
           <button 
             onClick={handleConnectPartner}
             disabled={isProcessing || !inviteCode.trim()}
-            className={`bg-gradient-to-r from-secondary-600 to-secondary-700 text-white px-5 py-2.5 rounded-xl transition-all duration-300 font-medium shadow-sm hover:shadow flex items-center justify-center whitespace-nowrap ${
-              isProcessing || !inviteCode.trim() ? 'opacity-70 cursor-not-allowed' : 'hover:from-secondary-700 hover:to-secondary-800'
+            className={`bg-gradient-to-r from-primary-600 to-primary-700 text-white px-5 py-2.5 rounded-xl transition-all duration-300 font-medium shadow-sm hover:shadow flex items-center justify-center whitespace-nowrap ${
+              isProcessing || !inviteCode.trim() ? 'opacity-70 cursor-not-allowed' : 'hover:from-primary-700 hover:to-primary-800'
             }`}
           >
             {isProcessing ? (

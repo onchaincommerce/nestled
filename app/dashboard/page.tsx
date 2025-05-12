@@ -39,16 +39,16 @@ export default function Dashboard() {
       
       if (response.ok) {
         const data = await response.json();
-        setIsInCouple(true); // Always set to true for now to ensure invite functionality works
+        setIsInCouple(data.isInCouple); // Use the actual couple status
         return data.isInCouple;
       } else {
         console.error('Failed to check couple status');
-        setIsInCouple(true); // Default to true to show invite functionality
+        setIsInCouple(false); // Default to false to show connect card
         return false;
       }
     } catch (error) {
       console.error('Error checking couple status:', error);
-      setIsInCouple(true); // Default to true to show invite functionality
+      setIsInCouple(false); // Default to false to show connect card
       return false;
     }
   };
@@ -483,11 +483,13 @@ export default function Dashboard() {
           />
         )}
         
-        {/* Always show the Active Invite Code component */}
-        <ActiveInviteCode
-          userID={userID}
-          baseUrl={baseUrl}
-        />
+        {/* Show the Active Invite Code component only if user is in a couple */}
+        {isInCouple === true && (
+          <ActiveInviteCode
+            userID={userID}
+            baseUrl={baseUrl}
+          />
+        )}
         
         <div className="bg-gradient-to-br from-white/90 to-primary-50/80 backdrop-blur-sm rounded-2xl shadow-sm border border-primary-100/30 p-5 mb-5 hover:shadow-md transition-all duration-300">
           <div className="p-3 bg-primary-50/80 rounded-xl mb-3 border border-primary-200/30">
