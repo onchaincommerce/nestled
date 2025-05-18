@@ -283,10 +283,23 @@ export async function GET(request: NextRequest) {
       inviteUrl: `/invite/${invite.code}`
     }));
     
+    // NEW: Check if couple is fully connected (2 or more users)
+    const { data: coupleUsers, error: coupleUsersError } = await supabase
+      .from('couples_users')
+      .select('user_id')
+      .eq('couple_id', coupleUserData.couple_id);
+    
+    let isFull = false;
+    if (!coupleUsersError && coupleUsers && coupleUsers.length >= 2) {
+      isFull = true;
+    }
+    
     return NextResponse.json({
       invitations: invitationsWithUrls,
       in_couple: true,
-      couple_id: coupleUserData.couple_id
+      couple_id: coupleUserData.couple_id,
+      is_full: isFull,
+      isFullyConnected: isFull
     });
   } catch (error) {
     console.error('Error in direct-invite GET endpoint:', error);

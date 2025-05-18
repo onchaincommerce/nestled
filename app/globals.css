@@ -56,6 +56,9 @@ body {
   .btn-secondary {
     @apply bg-secondary-100 text-secondary-700 px-5 py-2.5 rounded-2xl hover:bg-secondary-200 transition-colors font-medium shadow-sm;
   }
+  .btn-journal {
+    @apply bg-gradient-to-r from-primary-600 to-primary-700 text-white px-4 py-2 rounded-xl hover:from-primary-700 hover:to-primary-800 transition-all duration-300 font-medium shadow-sm hover:shadow;
+  }
   .card {
     @apply bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-100/60 p-4 hover:shadow-md transition-shadow;
   }

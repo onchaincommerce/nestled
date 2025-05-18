@@ -159,16 +159,14 @@ const ActiveInviteCode = ({ userID, baseUrl }: ActiveInviteCodeProps) => {
           created_at: new Date().toISOString(),
         });
         
-        // Trigger a window event to notify the dashboard that the couple status changed
-        if (typeof window !== 'undefined') {
-          const event = new CustomEvent('coupleStatusChanged', { 
-            detail: { 
-              isInCouple: true,
-              isFullyConnected: false // Explicitly mark as not fully connected
-            } 
-          });
-          window.dispatchEvent(event);
-        }
+        // Emit event to notify parent component of status change
+        const event = new CustomEvent('coupleStatusChanged', { 
+          detail: { 
+            isInCouple: true,
+            isFullyConnected: false
+          } 
+        });
+        window.dispatchEvent(event);
       } else {
         setError(data.error || 'Failed to generate invite code. Please try again later.');
       }

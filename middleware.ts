@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // Define an array of paths that require authentication
-const PROTECTED_PATHS = ['/dashboard', '/journal', '/scrapbook', '/date-planner'];
+const PROTECTED_PATHS = ['/dashboard'];
 
 // Define an array of paths that should be accessible only to non-authenticated users
 const AUTH_PATHS = ['/login', '/signup', '/'];

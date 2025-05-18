@@ -40,6 +40,8 @@ export default function ConnectPartnerCard({ userID, onSuccess, onError }: Conne
         setInviteCode(''); // Clear the input field
         onSuccess('Successfully connected with your partner!');
         
+        // Remove localStorage usage as we're now using database values
+        
         // Trigger an event to notify that the couple is now fully connected
         if (typeof window !== 'undefined') {
           const event = new CustomEvent('coupleStatusChanged', { 
